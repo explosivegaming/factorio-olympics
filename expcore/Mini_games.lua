@@ -1,7 +1,7 @@
 local Token = require 'utils.token'
 local Event = require 'utils.event'
 local Commands = require 'expcore.commands'
-local Gui = require 'expcore.gui' --- @dep expcore.gui
+local Gui = require 'expcore.gui._require'
 require 'config.expcore.command_runtime_disable' --required to load befor running the script
 
 
@@ -198,6 +198,80 @@ function Mini_games.error_in_game(error_game)
     Mini_games.stop_game()
     game.print("an error has occured things may be broken, error: "..error_game)
 end
+local mini_game_list
+local on_vote_click = function (player,element,event)
+    --local frame = Gui.get_left_element(player,mini_game_list).container
+    --local scroll = frame.scroll.table
+    local caption = tonumber(element.parent.parent["edit-1"]["race"].caption)+1
+    element.parent.parent["edit-1"]["race"].caption = tostring(caption)
+end
+
+
+local vote_button =
+Gui.element{
+    type = 'sprite-button',
+    sprite = 'utility/check_mark',
+    style = 'quick_bar_slot_button',   
+}
+:on_click(on_vote_click)
+
+
+local amount_label = 
+Gui.element(function(_,parent)
+parent.add{
+    type = "label",
+    caption = '0',  
+    style ="heading_1_label",
+    name = "race"
+}
+    
+end)
+
+local add_mini_game =
+Gui.element(function(_,parent)
+    local vote_flow = parent.add{ type = 'flow', }
+    vote_flow.style.padding = 0
+    vote_button(vote_flow)
+    parent.add{
+        type = "label",
+        caption = 'Race game',
+        style ="heading_1_label"
+    }
+    local edit_flow = Gui.alignment(parent,'edit-1')
+    edit_flow.style.right_padding = 15
+    amount_label(edit_flow)
+    
+
+end)
+
+
+
+mini_game_list =
+Gui.element(function(event_trigger,parent,...)
+    local container = Gui.container(parent,event_trigger,200)
+    local header = Gui.header(
+        container,
+        "Vote for the game",
+        "You can vote here for you favorite game.",
+        true
+    )
+    local scroll_table = Gui.scroll_table(container,250,3,"thing")
+    local scroll_table_style = scroll_table.style 
+    scroll_table_style.top_cell_padding = 3
+    scroll_table_style.bottom_cell_padding = 3
+    add_mini_game(scroll_table)
+    --add_mini_game(scroll_table)
+    
+
+
+    
+end)
+:add_to_left_flow(true)
+Gui.left_toolbar_button('entity/inserter','Nothing to see here',mini_game_list,function()  return true end)
+
+
+
+
 --[[
 local example_button =
 Gui.element{
