@@ -4,6 +4,7 @@ local task              = require "utils.task"
 local Permission_Groups = require "expcore.permission_groups"
 local Global            = require 'utils.global' --Used to prevent desynicing.
 local interface         = require 'modules.commands.interface'
+local Gui               = require 'expcore.gui._require'
 local surface = {}
 local gates = {}
 local areas = {}
@@ -477,6 +478,20 @@ local function on_player_left_game(event)
 end
 
 
+--gui
+local dorpdown = 
+Gui.element{
+    type = 'drop-down',
+    items = {"nuclear-fuel"}  
+}
+
+local maingui = 
+Gui.element(function(_,parent)
+    local main_flow = parent.add{ type = 'flow'}
+    dorpdown(main_flow)
+
+end)
+
 race:add_map("Race game", -80, -140)
 race:add_start_function(start)
 race:add_stop_function(stop)
@@ -486,6 +501,7 @@ race:add_event(defines.events.on_entity_died, car_destroyed)
 race:add_event(defines.events.on_player_driving_changed_state, back_in_car)
 race:add_event(defines.events.on_player_joined_game, player_join)
 race:add_event(defines.events.on_pre_player_left_game, on_player_left_game)
+race:add_gui_element(maingui)
 race:add_option(3)
 
 

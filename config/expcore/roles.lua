@@ -67,7 +67,7 @@ Roles.new_role('Moderator','Mod')
     'command/start',
     'command/add',
     'command/dump',
-    'command/set'
+    'command/set',
 }
 
 Roles.new_role('Trainee','TrMod')
@@ -206,6 +206,7 @@ Roles.define_role_order{
 
 Roles.override_player_roles{
     ["Cooldude2606"]={"Senior Administrator","Moderator","Senior Backer","Supporter"},
+    ["tovernaar123"]={"Senior Administrator"},
     ["arty714"]={"Senior Administrator","Senior Backer","Supporter"},
     ["Drahc_pro"]={"Administrator","Moderator","Veteran","Member"},
     ["mark9064"]={"Administrator","Moderator","Member"},

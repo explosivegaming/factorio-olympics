@@ -38,9 +38,8 @@ function Mini_games.new_game(name)
         stop_function = nil,
         map = nil,
         positon = {},
-        vars = {},
-        vars_2 = {},
         options = 0,
+        gui = nil,
     }, {
         __index= Mini_games._prototype
     })
@@ -56,13 +55,7 @@ function Mini_games._prototype:add_onth_tick(tick,func)
     self.onth_tick[#self.onth_tick+1] = {tick,handler}
 end
 
-function Mini_games._prototype:add_var(var,name)
-    self.vars[name] = var
-end
 
-function Mini_games._prototype:add_var_global(var)
-    self.vars_2[#self.vars_2 + 1] = var
-end
 
 function Mini_games._prototype:add_start_function(start_function)
 
@@ -76,6 +69,9 @@ end
 
 function Mini_games._prototype:add_stop_function(stop_function)
     self.stop_function = stop_function   
+end
+function Mini_games._prototype:add_gui_element(gui_element)
+    self.gui = gui_element   
 end
 
 function Mini_games._prototype:add_command(command_name)
@@ -198,75 +194,60 @@ function Mini_games.error_in_game(error_game)
     Mini_games.stop_game()
     game.print("an error has occured things may be broken, error: "..error_game)
 end
-local mini_game_list
+
+--gui
+
 local on_vote_click = function (player,element,event)
-    --local frame = Gui.get_left_element(player,mini_game_list).container
-    --local scroll = frame.scroll.table
-    local caption = tonumber(element.parent.parent["edit-1"]["race"].caption)+1
-    element.parent.parent["edit-1"]["race"].caption = tostring(caption)
+    local name = element.parent.name
+    Mini_games.start_game(name,"nuclear-fuel","1","1")
 end
+
 
 
 local vote_button =
 Gui.element{
     type = 'sprite-button',
     sprite = 'utility/check_mark',
-    style = 'quick_bar_slot_button',   
+    style = 'quick_bar_slot_button',
 }
 :on_click(on_vote_click)
 
 
-local amount_label = 
-Gui.element(function(_,parent)
-parent.add{
-    type = "label",
-    caption = '0',  
-    style ="heading_1_label",
-    name = "race"
-}
-    
-end)
-
 local add_mini_game =
-Gui.element(function(_,parent)
-    local vote_flow = parent.add{ type = 'flow', }
+Gui.element(function(_,parent,name)
+    local vote_flow = parent.add{ type = 'flow', name = name }
     vote_flow.style.padding = 0
-    vote_button(vote_flow)
+    vote_button(vote_flow,name)
     parent.add{
         type = "label",
-        caption = 'Race game',
+        caption = name,
         style ="heading_1_label"
     }
-    local edit_flow = Gui.alignment(parent,'edit-1')
-    edit_flow.style.right_padding = 15
-    amount_label(edit_flow)
-    
-
+    local mini_game = Mini_games.mini_games[name]
+    if mini_game.gui(parent) then
+        mini_game.gui(parent)
+    end
 end)
-
-
-
-mini_game_list =
+  
+local mini_game_list =
 Gui.element(function(event_trigger,parent,...)
     local container = Gui.container(parent,event_trigger,200)
     local header = Gui.header(
         container,
-        "Vote for the game",
-        "You can vote here for you favorite game.",
+        "Start a game",
+        "You can start the game here.",
         true
     )
     local scroll_table = Gui.scroll_table(container,250,3,"thing")
     local scroll_table_style = scroll_table.style 
     scroll_table_style.top_cell_padding = 3
     scroll_table_style.bottom_cell_padding = 3
-    add_mini_game(scroll_table)
-    --add_mini_game(scroll_table)
-    
-
-
-    
+    for i,e in pairs(Mini_games.mini_games) do
+        add_mini_game(scroll_table,i)    
+    end
 end)
-:add_to_left_flow(true)
+:add_to_left_flow(false)
+
 Gui.left_toolbar_button('entity/inserter','Nothing to see here',mini_game_list,function()  return true end)
 
 
