@@ -62,6 +62,7 @@ Roles.new_role('Moderator','Mod')
     'command/win',
     'command/test',
     'command/hi',
+    'gui/game_start',
     'command/stop',
     'command/clear_votes',
     'command/start',

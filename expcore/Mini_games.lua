@@ -3,6 +3,7 @@ local Event = require 'utils.event'
 local Commands = require 'expcore.commands'
 local Gui = require 'expcore.gui._require'
 require 'config.expcore.command_runtime_disable' --required to load befor running the script
+local Roles = require 'expcore.roles' --- @dep expcore.roles
 
 
 local Mini_games = {}
@@ -249,13 +250,15 @@ Gui.element(function(event_trigger,parent,...)
     local scroll_table_style = scroll_table.style 
     scroll_table_style.top_cell_padding = 3
     scroll_table_style.bottom_cell_padding = 3
+    
     for i,e in pairs(Mini_games.mini_games) do
         add_mini_game(scroll_table,i)    
     end
+    return container.parent
 end)
 :add_to_left_flow(false)
 
-Gui.left_toolbar_button('entity/inserter','Nothing to see here',mini_game_list,function()  return true end)
+Gui.left_toolbar_button('entity/inserter','Nothing to see here',mini_game_list,function(player)  return Roles.player_allowed(player,'gui/game_start') end)
 
 
 
