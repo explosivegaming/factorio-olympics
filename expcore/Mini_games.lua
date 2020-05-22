@@ -40,6 +40,7 @@ function Mini_games.new_game(name)
         positon = {},
         options = 0,
         gui = nil,
+        gui_callback = nil,
     }, {
         __index= Mini_games._prototype
     })
@@ -74,6 +75,11 @@ function Mini_games._prototype:add_gui_element(gui_element)
     self.gui = gui_element   
 end
 
+function Mini_games._prototype:add_gui_callback(callback)
+    self.gui_callback = callback   
+end
+
+
 function Mini_games._prototype:add_command(command_name)
     self.commands[#self.commands + 1] = command_name
     Commands.disable(command_name)
@@ -92,9 +98,7 @@ function Mini_games._prototype:add_event(event_name,func)
 end
 
 
-function Mini_games.start_game(name,...)
-
-    local parse_args = {...}
+function Mini_games.start_game(name,parse_args)
     local mini_game = Mini_games.mini_games[name]
     if mini_game == nil then
         return "This mini_game does not exsit"
@@ -199,7 +203,10 @@ end
 
 local on_vote_click = function (player,element,event)
     local name = element.parent.name
-    Mini_games.start_game(name,"nuclear-fuel","1","1")
+    local scroll_table = element.parent.parent
+    local mini_game = Mini_games.mini_games[name]
+    local args = mini_game.gui_callback(scroll_table)
+    Mini_games.start_game(name,args)
 end
 
 

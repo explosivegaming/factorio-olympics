@@ -482,20 +482,58 @@ end
 local dorpdown = 
 Gui.element{
     type = 'drop-down',
-    items = {"nuclear-fuel"}  
+    items = {"nuclear-fuel","wood","coal","solid-fuel","rocket-fuel"},
+    selected_index = 1
+}
+local text_field_for_laps = 
+Gui.element{
+    type = 'textfield',
+    text  = "1",
+    numeric = true,
+}
+:style{
+  width = 25
+}
+local text_field_for_players = 
+Gui.element{
+    type = 'textfield',
+    text  = "1",
+    numeric = true,
+}
+:style{
+  width = 25
 }
 
 local maingui = 
 Gui.element(function(_,parent)
-    local main_flow = parent.add{ type = 'flow'}
+    local main_flow = parent.add{ type = 'flow', name = "Race_flow"}
     dorpdown(main_flow)
+    text_field_for_laps(main_flow)
+    text_field_for_players(main_flow)
+    
 
 end)
+local function gui_callback(parent)
+    local args = {}
+    local flow = parent["Race_flow"]
+
+    local dorpdown = flow[dorpdown.name]
+    local fuel = dorpdown.get_item(dorpdown.selected_index)
+    args[1] = fuel
+
+    local laps = flow[text_field_for_laps.name].text
+    args[2] = laps
+
+    local players = flow[text_field_for_players.name].text
+    args[3] = players
+
+    return args
+end
 
 race:add_map("Race game", -80, -140)
 race:add_start_function(start)
 race:add_stop_function(stop)
---race:add_event(defines.events.on_entity_damaged, player_invisabilty)
+race:add_gui_callback(gui_callback)
 race:add_event(defines.events.on_player_changed_position, player_move)
 race:add_event(defines.events.on_entity_died, car_destroyed)
 race:add_event(defines.events.on_player_driving_changed_state, back_in_car)
