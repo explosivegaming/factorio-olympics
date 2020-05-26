@@ -7,14 +7,16 @@ local Roles = require 'expcore.roles' --- @dep expcore.roles
 
 
 local Mini_games = {}
-
+local main_gui = {}
 local started_game = {}
 
 local Global = require 'utils.global' --Used to prevent desynicing.
 Global.register({
     started_game = started_game,
+    main_gui = main_gui,
 },function(tbl)
     started_game = tbl.started_game
+    main_gui = tbl.main_gui
 end)
 
 Mini_games["mini_games"] = {}
@@ -104,9 +106,14 @@ function Mini_games.start_game(name,parse_args)
     if mini_game == nil then
         return "This mini_game does not exsit"
     end
-
-    if  mini_game.options ~= #parse_args then
-        return "Wrong number of arguments"
+    if parse_args then
+        if  mini_game.options ~= #parse_args then
+            return "Wrong number of arguments"
+        end
+    else 
+        if mini_game.options ~= 0 then
+            return "Wrong number of arguments"
+        end
     end
 
     if started_game[1] == name then
@@ -190,6 +197,10 @@ function Mini_games.stop_game()
     for i,command_name  in ipairs(mini_game.commands) do
         Commands.disable(command_name)
     end
+    for i,player in ipairs(game.connected_players) do
+        Gui.update_top_flow(player)
+    end
+    
 
 end
 
@@ -199,15 +210,38 @@ function Mini_games.error_in_game(error_game)
     Mini_games.stop_game()
     game.print("an error has occured things may be broken, error: "..error_game)
 end
+<<<<<<< Updated upstream
 
 --gui
 
+=======
+local mini_game_list
+--gui
+>>>>>>> Stashed changes
 local on_vote_click = function (player,element,event)
     local name = element.parent.name
     local scroll_table = element.parent.parent
     local mini_game = Mini_games.mini_games[name]
+<<<<<<< Updated upstream
     local args = mini_game.gui_callback(scroll_table)
     Mini_games.start_game(name,args)
+=======
+    local args
+    if mini_game.gui_callback then
+        args = mini_game.gui_callback(scroll_table)
+    end
+    --main_gui[1] = element.parent.parent.parent.parent.parent.parent
+    for i,player in ipairs(game.connected_players) do
+        main_gui[i] = Gui.get_left_element(player,mini_game_list)
+        Gui.toggle_left_element(player,main_gui[1],false)
+    end
+    if args then
+        Mini_games.start_game(name,args)
+    else 
+        Mini_games.start_game(name)
+    end
+    Gui.update_top_flow(player) 
+>>>>>>> Stashed changes
 end
 
 
@@ -232,12 +266,20 @@ Gui.element(function(_,parent,name)
         style ="heading_1_label"
     }
     local mini_game = Mini_games.mini_games[name]
+<<<<<<< Updated upstream
     if mini_game.gui(parent) then
+=======
+    if mini_game.gui then
+>>>>>>> Stashed changes
         mini_game.gui(parent)
     end
 end)
   
+<<<<<<< Updated upstream
 local mini_game_list =
+=======
+mini_game_list =
+>>>>>>> Stashed changes
 Gui.element(function(event_trigger,parent,...)
     local container = Gui.container(parent,event_trigger,200)
     local header = Gui.header(
@@ -258,7 +300,11 @@ Gui.element(function(event_trigger,parent,...)
 end)
 :add_to_left_flow(false)
 
+<<<<<<< Updated upstream
 Gui.left_toolbar_button('entity/inserter','Nothing to see here',mini_game_list,function(player)  return Roles.player_allowed(player,'gui/game_start') end)
+=======
+Gui.left_toolbar_button('utility/check_mark','Nothing to see here',mini_game_list,function(player)  return Roles.player_allowed(player,'gui/game_start') and not started_game[1] end)
+>>>>>>> Stashed changes
 
 
 
