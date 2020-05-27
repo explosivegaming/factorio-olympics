@@ -210,22 +210,12 @@ function Mini_games.error_in_game(error_game)
     Mini_games.stop_game()
     game.print("an error has occured things may be broken, error: "..error_game)
 end
-<<<<<<< Updated upstream
-
---gui
-
-=======
 local mini_game_list
 --gui
->>>>>>> Stashed changes
 local on_vote_click = function (player,element,event)
     local name = element.parent.name
     local scroll_table = element.parent.parent
     local mini_game = Mini_games.mini_games[name]
-<<<<<<< Updated upstream
-    local args = mini_game.gui_callback(scroll_table)
-    Mini_games.start_game(name,args)
-=======
     local args
     if mini_game.gui_callback then
         args = mini_game.gui_callback(scroll_table)
@@ -241,7 +231,6 @@ local on_vote_click = function (player,element,event)
         Mini_games.start_game(name)
     end
     Gui.update_top_flow(player) 
->>>>>>> Stashed changes
 end
 
 
@@ -266,20 +255,12 @@ Gui.element(function(_,parent,name)
         style ="heading_1_label"
     }
     local mini_game = Mini_games.mini_games[name]
-<<<<<<< Updated upstream
-    if mini_game.gui(parent) then
-=======
     if mini_game.gui then
->>>>>>> Stashed changes
         mini_game.gui(parent)
     end
 end)
   
-<<<<<<< Updated upstream
-local mini_game_list =
-=======
 mini_game_list =
->>>>>>> Stashed changes
 Gui.element(function(event_trigger,parent,...)
     local container = Gui.container(parent,event_trigger,200)
     local header = Gui.header(
@@ -294,17 +275,13 @@ Gui.element(function(event_trigger,parent,...)
     scroll_table_style.bottom_cell_padding = 3
     
     for i,e in pairs(Mini_games.mini_games) do
-        add_mini_game(scroll_table,i)    
+        add_mini_game(scroll_table,i) 
     end
     return container.parent
 end)
 :add_to_left_flow(false)
 
-<<<<<<< Updated upstream
-Gui.left_toolbar_button('entity/inserter','Nothing to see here',mini_game_list,function(player)  return Roles.player_allowed(player,'gui/game_start') end)
-=======
 Gui.left_toolbar_button('utility/check_mark','Nothing to see here',mini_game_list,function(player)  return Roles.player_allowed(player,'gui/game_start') and not started_game[1] end)
->>>>>>> Stashed changes
 
 
 
@@ -326,4 +303,6 @@ Gui.left_toolbar_button('entity/inserter', 'Nothing to see here', example_button
 
 --left_toolbar_button
 ]]
+
+
 return Mini_games
