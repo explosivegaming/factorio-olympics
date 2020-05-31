@@ -51,9 +51,9 @@ local function reset_all() -- Resets all tables and vars so /start can be used a
     Table_for_varibaibels["Time"] = 0
     for i, player in pairs(game.connected_players) do
         if player.admin then
-            Permission_Groups.set_player_group(player,"Admin") 
+            Permission_Groups.set_player_group(player, "Admin") 
         else
-            Permission_Groups.set_player_group(player,"Guest")
+            Permission_Groups.set_player_group(player, "Guest")
         end
     end 
     
@@ -77,7 +77,7 @@ local function tell_players() --Tells the players if they are griefer or a good-
       player.print("You are the griefer, stop the good-guys from finishing the goal.")
     end
     
-    for index,player in pairs(game.connected_players) do
+    for index, player in pairs(game.connected_players) do
       if not done[index] then
         player.print("You are a good-guy, finish the goal.")
       end
@@ -93,17 +93,17 @@ Global.register({
   who_voted = who_voted, 
   out = out,  
   griefers = griefers,
-},function(tbl)
+}, function(tbl)
   Table_for_varibaibels = tbl.Table_for_varibaibels
   votes = tbl.votes 
   who_voted = tbl.who_voted 
   out = tbl.out  
   griefers = tbl.griefers
 end)
-Commands.new_command('start','Command to start griefer game.') --Used to start the game (always needs to be run first).
-    :add_param('amount_of_griefers',false,'number')
-    :add_param('time_in_min',false,'number')
-    :register(function(player,amount_of_griefers,time,raw)
+Commands.new_command('start', 'Command to start griefer game.') --Used to start the game (always needs to be run first).
+    :add_param('amount_of_griefers', false, 'number')
+    :add_param('time_in_min', false, 'number')
+    :register(function(player, amount_of_griefers, time, raw)
             local online = #game.connected_players
             game.print(online)
             if online < amount_of_griefers then 
@@ -121,7 +121,7 @@ Commands.new_command('start','Command to start griefer game.') --Used to start t
             local i = 0
 
             while i < amount_of_griefers do 
-                local random = math.random(1,online)
+                local random = math.random(1, online)
                 local griefer = game.connected_players[random]
                 if not has_value(griefers, griefer) then
                   i = i + 1
@@ -133,15 +133,15 @@ Commands.new_command('start','Command to start griefer game.') --Used to start t
             tell_players()
 
         end)
-Commands.new_command('add','Command to add a griefer.') --Adds a griefer (admin only).
-        :add_param('amount_of_griefers',false,'number')
-        :register(function(player,amount_of_griefers,raw)
+Commands.new_command('add', 'Command to add a griefer.') --Adds a griefer (admin only).
+        :add_param('amount_of_griefers', false, 'number')
+        :register(function(player, amount_of_griefers, raw)
                 if Table_for_varibaibels["started"] then
                     local online = #game.connected_players
                     local i = 0
 
                     while i < amount_of_griefers do 
-                        local random = math.random(1,online)
+                        local random = math.random(1, online)
                         local griefer = game.connected_players[random]
                         if not has_value(griefers, griefer) then
                             i = i + 1
@@ -156,10 +156,10 @@ Commands.new_command('add','Command to add a griefer.') --Adds a griefer (admin 
             end)
 
 --Used to vote peopol out.
-Commands.new_command('vote','Use /vote to vote out players that you think are griefers.')
-    :add_param('name_of_griefer',false)
+Commands.new_command('vote', 'Use /vote to vote out players that you think are griefers.')
+    :add_param('name_of_griefer', false)
     :register(
-        function(player,name_of_griefer,raw)
+        function(player, name_of_griefer, raw)
             if  not Table_for_varibaibels["started"] then
                 return Commands.error("The game is not started use /start (amountofgriefers time).") 
             end
@@ -194,8 +194,8 @@ Commands.new_command('vote','Use /vote to vote out players that you think are gr
             if votes[name_of_griefer] >= required_votes then
                 local the_one = game.players[name_of_griefer]
                 out[name_of_griefer] = true
-                Permission_Groups.set_player_group(the_one,"Voted_out")
-                if has_value(griefers,the_one) then
+                Permission_Groups.set_player_group(the_one, "Voted_out")
+                if has_value(griefers, the_one) then
                     game.print(name_of_griefer.." Was a griefer and has been voted out! All votes have been reset.")
                     if Table_for_varibaibels["cought"] > 1 then
                         game.print("Their are "..Table_for_varibaibels["cought"].." griefers left.")
@@ -215,8 +215,8 @@ Commands.new_command('vote','Use /vote to vote out players that you think are gr
         end)
 
 --Used to win the game after goal has been done (admin only).
-Commands.new_command('win','Command to call out a win for the good guys.')
-    :register(function(player,raw)
+Commands.new_command('win', 'Command to call out a win for the good guys.')
+    :register(function(player, raw)
         if Table_for_varibaibels["started"] then
             game.print("VICTORY!!!, the griefers where:")
             for i, player in ipairs(griefers) do
@@ -229,8 +229,8 @@ Commands.new_command('win','Command to call out a win for the good guys.')
     end)
 
 --Shows the time left.
-Commands.new_command('time_left','Command to call out a win for the good guys.')
-    :register(function(player,raw)
+Commands.new_command('time_left', 'Command to call out a win for the good guys.')
+    :register(function(player, raw)
         if Table_for_varibaibels["started"] then
             player.print("You have "..math.ceil(Table_for_varibaibels["Time"]/3600).." more minutes.")
         else 
@@ -239,23 +239,23 @@ Commands.new_command('time_left','Command to call out a win for the good guys.')
     end)
 
 --Shows all votes.
-Commands.new_command('all_votes','Command to see all votes.')
-    :register(function(player,raw)
-        for i,num in pairs(votes) do
+Commands.new_command('all_votes', 'Command to see all votes.')
+    :register(function(player, raw)
+        for i, num in pairs(votes) do
             player.print(i.." Has"..num.." Votes")
         end
 
     end)
 --Clears all votes.
-Commands.new_command('clear_votes','Command to clear all votes.')
-    :register(function(player,raw)
+Commands.new_command('clear_votes', 'Command to clear all votes.')
+    :register(function(player, raw)
         votes = {}
         who_voted = {}
 
     end)
 
 --Handles time and print when time is up.    
-Event.on_nth_tick(300,function(event)
+Event.on_nth_tick(300, function(event)
     if Table_for_varibaibels["started"] then
         Table_for_varibaibels["Time"] = Table_for_varibaibels["Time"] -300
         if Table_for_varibaibels["Time"] < 1 then  
