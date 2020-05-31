@@ -29,18 +29,14 @@ end
 
 local interface_env = {} -- used as a persistent sandbox for interface commands
 local interface_callbacks = {} -- saves callbacks which can load new values per use
-Global.register({
-    interface_env = interface_env,
-    interface_callbacks = interface_callbacks
-}, function(tbl)
-    interface_env = tbl.interface_env
-    interface_callbacks = tbl.interface_callbacks
+Global.register(interface_env, function(tbl)
+    interface_env = tbl
 end)
 
 --- Adds a callback function when the interface command is used
 -- nb: returned value is saved in the env that the interface uses
 -- @tparam string name the name that the value is loaded under, cant use upvalues
--- @tparam function callback the function that will run whent he command is used
+-- @tparam function callback the function that will run when the command is used
 -- callback param - player: LuaPlayer - the player who used the command
 local function add_interface_callback(name, callback)
     if type(callback) == 'function' then
@@ -49,7 +45,7 @@ local function add_interface_callback(name, callback)
 end
 
 -- this is a meta function for __index when self[key] is nil
-local function get_index(self, key)
+local function get_index(_, key)
     if interface_env[key] then
         return interface_env[key]
     elseif interface_modules[key] then
@@ -64,7 +60,7 @@ Commands.new_command('interface', 'Sends an innovation to be ran and returns the
 :add_param('innovation', false)
 :enable_auto_concat()
 :set_flag('admin_only')
-:register(function(player, innovation, raw)
+:register(function(player, innovation)
     if not innovation:find('%s') and not innovation:find('return') then
         -- if there are no spaces and return is not present then return is appended to the start
         innovation='return '..innovation
@@ -74,7 +70,7 @@ Commands.new_command('interface', 'Sends an innovation to be ran and returns the
     if player then -- player can be nil when it is the server
         for name, callback in pairs(interface_callbacks) do
             -- loops over callbacks and loads the values returned
-            local success, rtn = pcall(callback, player)
+            local _, rtn = pcall(callback, player)
             temp_env[name]=rtn
         end
     end

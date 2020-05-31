@@ -307,7 +307,6 @@ local key = auto_complete(tbl, "foo", true, true)
 
 ]]
 function Common.auto_complete(options, input, use_key, rtn_key)
-    local rtn = {}
     if type(input) ~= 'string' then return end
     input = input:lower()
     for key, value in pairs(options) do
@@ -318,8 +317,8 @@ function Common.auto_complete(options, input, use_key, rtn_key)
     end
 end
 
---- Formating.
--- @section formating
+--- Formatting.
+-- @section formatting
 
 --[[-- Returns a valid string with the name of the actor of a command.
 @tparam string player_name the name of the player to use rather than server, used only if game.player is nil
@@ -589,7 +588,7 @@ function Common.move_items(items, surface, position, radius, chest_type)
     local last_chest
     for item_name, item_count in pairs(items) do
         local chest = next_chest{name=item_name, count=item_count}
-        if not chest then return error(string.format('Cant move item %s to %s{%s, %s} no valid chest in radius', item.name, surface.name, p.x, p.y)) end
+        if not chest then return error(string.format('Cant move item %s to %s{%s, %s} no valid chest in radius', item_name, surface.name, p.x, p.y)) end
         Util.insert_safe(chest, {[item_name]=item_count})
         last_chest = chest
     end

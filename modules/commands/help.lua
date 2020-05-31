@@ -15,7 +15,7 @@ Global.register(search_cache, function(tbl)
 end)
 
 --- Searches for a keyword in all commands you are allowed to use.
--- @command chelp
+-- @command search-help
 -- @tparam string keyword the keyword that will be looked for
 -- @tparam number page the page of help to view, must be in range of pages
 Commands.new_command('search-help', 'Searches for a keyword in all commands you are allowed to use.')
@@ -23,7 +23,7 @@ Commands.new_command('search-help', 'Searches for a keyword in all commands you 
 :add_param('keyword', true)
 :add_param('page', true, 'integer')
 :set_defaults{keyword='', page=1}
-:register(function(player, keyword, page, raw)
+:register(function(player, keyword, page)
     local player_index = player and player.index or 0
     -- if keyword is a number then treat it as page number
     if tonumber(keyword) then

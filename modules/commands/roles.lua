@@ -17,7 +17,7 @@ Commands.new_command('assign-role', 'Assigns a role to a player')
 :add_param('role', false, 'role')
 :set_flag('admin-only')
 :add_alias('rpromote', 'assign', 'role', 'add-role')
-:register(function(player, action_player, role, raw)
+:register(function(player, action_player, role)
     local player_highest = Roles.get_player_highest_role(player)
     if player_highest.index < role.index then
         Roles.assign_player(action_player, role, player.name)
@@ -35,7 +35,7 @@ Commands.new_command('unassign-role', 'Unassigns a role from a player')
 :add_param('role', false, 'role')
 :set_flag('admin-only')
 :add_alias('rdemote', 'unassign', 'rerole', 'remove-role')
-:register(function(player, action_player, role, raw)
+:register(function(player, action_player, role)
     local player_highest = Roles.get_player_highest_role(player)
     if player_highest.index < role.index then
         Roles.unassign_player(action_player, role, player.name)
@@ -50,11 +50,11 @@ end)
 Commands.new_command('list-roles', 'Lists all roles in they correct order')
 :add_param('player', true, 'player')
 :add_alias('lsroles', 'roles')
-:register(function(player, action_player, raw)
+:register(function(_, player)
     local roles = Roles.config.order
     local message = {'expcom-roles.list'}
-    if action_player then
-        roles = Roles.get_player_roles(action_player)
+    if player then
+        roles = Roles.get_player_roles(player)
     end
     for index, role in pairs(roles) do
         role = Roles.get_role_from_any(role)
@@ -62,8 +62,8 @@ Commands.new_command('list-roles', 'Lists all roles in they correct order')
         local role_name = format_chat_colour_localized(role.name, colour)
         if index == 1 then
             message = {'expcom-roles.list', role_name}
-            if action_player then
-                local player_name_colour = format_chat_player_name(action_player)
+            if player then
+                local player_name_colour = format_chat_player_name(player)
                 message = {'expcom-roles.list-player', player_name_colour, role_name}
             end
         else

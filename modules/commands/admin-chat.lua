@@ -15,7 +15,7 @@ Commands.new_command('admin-chat', 'Sends a message in chat that only admins can
 :enable_auto_concat()
 :set_flag('admin_only')
 :add_alias('ac')
-:register(function(player, message, raw)
+:register(function(player, message)
     local player_name_colour = format_chat_player_name(player)
     for _, return_player in pairs(game.connected_players) do
         if return_player.admin then
