@@ -17,7 +17,7 @@ jobs:
       - name: Lint
         uses: Roang-zero1/factorio-mod-luacheck@master
         with:
-          luacheckrc_url: https://raw.githubusercontent.com/explosivegaming/scenario/${{ steps.extract_branch.outputs.branch }}/.luacheckrc
+          luacheckrc_url: https://raw.githubusercontent.com/explosivegaming/factorio-olympics/${{ steps.extract_branch.outputs.branch }}/.luacheckrc
 
   docs:
     runs-on: ubuntu-latest
