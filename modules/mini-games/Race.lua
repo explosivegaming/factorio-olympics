@@ -31,7 +31,7 @@ local function setup_areas()
         gate_boxes[4] = surface[1].get_script_areas("gate_4")[1].area
     end
 
-    variables["finish"] = surface[1].get_script_areas("finish_line")[1].area
+    variables["finsih"] = surface[1].get_script_areas("finsish_line")[1].area
 
     --gate
     if not gates[1] then
@@ -42,11 +42,13 @@ local function setup_areas()
     end
 end
 
+
 Permission_Groups.new_group('out_car')
 :disallow_all()
 :allow{
     'write_to_console'
 }
+
 
 Global.register({
     surface = surface, --y
@@ -56,7 +58,7 @@ Global.register({
     player_progress = player_progress, --y
     cars = cars, --y
     scores = scores, --y
-    laps = laps, --y
+    laps = laps, --y 
     gate_boxes = gate_boxes, --y
     start_players = start_players --y
 }, function(tbl)
@@ -70,11 +72,12 @@ Global.register({
     laps = tbl.laps
     gate_boxes = tbl.gate_boxes
     start_players = tbl.start_players
+    
 end)
 
 local function reset_table(table)
-    for key in pairs(table) do
-        table[key] = nil
+    for i, value in pairs(table) do
+        table[i] = nil
     end
 end
 
@@ -87,19 +90,19 @@ local function resetall()
     reset_table(laps)
     reset_table(start_players)
 end
+local token_for_start 
 
-local token_for_start
 local function race_count_down()
+    
     variables["count_down"]  = variables["count_down"]  -1
     if  variables["count_down"] ~= 0 then
         game.print("[color=red]"..variables["count_down"].."[/color]")
     end
-
     if variables["count_down"] == 0 then
         game.print("[color=green]0 --> GO![/color]")
         for i, player_name in pairs(start_players) do
             local car = cars[player_name]
-            car.get_fuel_inventory().insert({name = variables["fuel"], count = 100})
+            car.get_fuel_inventory().insert({name = variables["fuel"], count = 100})   
             scores[player_name].time = game.tick
         end
     else
@@ -112,12 +115,15 @@ local function pick_player()
     local player = game.connected_players[math.random(#game.connected_players)]
     if not start_players[player.name] then
         return player
-    else
+    else 
         return  pick_player()
     end
 end
 
+
 local start = function(args)
+    
+
     surface[1] = game.surfaces["Race game"]
     variables["done_left"] = 0
     variables["count_down"] = 4
@@ -129,31 +135,27 @@ local start = function(args)
     variables["player"] = tonumber(args[3])
     variables["place"] = 1
     variables["new_joins"] = 0
-    scores["finished_times"] = {}
-
-    if not variables["laps"] then
+    scores["finshed_times"] = {}
+    if not variables["laps"] then 
         variables["error_game"] = "No laps set"
     end
-
     if not game.item_prototypes[variables["fuel"]] then
         variables["error_game"] = "wrong fuel"
     end
-
     local pick_all = false
     if variables["player"] >= #game.connected_players then
         pick_all = true
         variables["player"] =  #game.connected_players
     end
-
     --for i, player in ipairs(game.connected_players) do
     for i=1, variables["player"] do
-        local player
+        local player 
         if pick_all then
             player = game.connected_players[i]
         else
             player = pick_player()
         end
-        start_players[player.name] = player.name
+        start_players[player.name] = player.name 
         local pos
         if (variables["left"]) then
             pos = {-85, -126 + variables["done_left"] * 5}
@@ -184,25 +186,28 @@ local start = function(args)
     end
 
     for i, player in ipairs(game.connected_players) do
-        if not start_players[player.name]  then
+        if not  start_players[player.name]  then
+            local player = game.players[player.name]
             player.character.destroy()
-            variables["new_joins"] = variables["new_joins"] + 1
+            variables["new_joins"] = variables["new_joins"] + 1   
         end
     end
-
-    local set_laps = variables["laps"]
+    local laps = variables["laps"]
     game.print("[color=#39ff14]Race started![/color]")
     game.print("[color=#39ff14]Racing in a car with "..variables["fuel"]..".[/color]")
-    game.print("[color=#39ff14]Laps: "..set_laps..".[/color]")
+    game.print("[color=#39ff14]Laps: "..laps..".[/color]")
     task.set_timeout_in_ticks(10, token_for_start)
     setup_areas()
+
+
 
     if variables["error_game"] then
         Mini_games.error_in_game(variables["error_game"])
     end
 
-end
 
+    
+end
 --@author https://rosettacode.org/wiki/N%27th#Lua
 local function getSuffix (n)
     local lastTwo, lastOne = n % 100, n % 10
@@ -212,7 +217,7 @@ local function getSuffix (n)
     if lastOne == 3 then return "rd" end
     return "th"
 end
-
+ 
 local function Nth (n) return n..getSuffix(n) end
 
 --@author tovernaar123
@@ -223,16 +228,17 @@ local stop = function()
     for i, player in ipairs(game.connected_players) do
         if not player.character then
             player.create_character()
-        end
+        end 
     end
     local colors =  {
         ["1st"] = "[color=#FFD700]",
         ["2nd"] = "[color=#C0C0C0]",
         ["3rd"] = "[color=#cd7f32]"
     }
-    for i, value in pairs(scores["finished_times"]) do
-        local place = Nth(value[1])
+    for i, value in pairs(scores["finshed_times"]) do
+        local place = value[1]
         local time = value[2]
+        local place = Nth(place)
         if colors[place] then
             game.print(colors[place]..place..": "..i.." with "..time.." seconds.[/color]")
         else
@@ -265,7 +271,7 @@ local player_move = function(event)
                 if i ~= 5 then
                     if progress == i or progress - 1 == i then
                         found_match = true
-                        for _, gate in ipairs(gates[i]) do
+                        for i, gate in ipairs(gates[i]) do
                             gate.request_to_open(gate.force, 100)
                         end
                         if progress == i and progress ~= 5 then
@@ -276,7 +282,7 @@ local player_move = function(event)
             end
             if not found_match then
                 if insideBox(gate_boxes[4], pos) then
-                    if player_progress[name] < 5 then
+                    if player_progress[name] < 5 then 
                         local car = cars[name]
                         if car then
                             if car.valid then
@@ -295,48 +301,48 @@ local player_move = function(event)
             end
         end
         if not found_match then
-            if insideBox(variables["finish"], pos) then
-                if player_progress[name] then
+            if insideBox(variables["finsih"], pos) then
+                if player_progress[name] then 
                     if player_progress[name] == 5 then
                         player_progress[name] = 1
                         if laps[name] then
                             laps[name] = laps[name] + 1
                         else
-                            laps[name] = 1
+                            laps[name] = 1 
                         end
-                        local finished = false
-                        if laps[name] >= variables["laps"] then
+                        local finsihed = false
+                        if laps[name] >= variables["laps"] then 
                             cars[name].destroy()
                             cars[name] = nil
                             if player.character then
                                 player.character.destroy()
                             end
-                            finished = true
+                            finsihed = true
                             local time = tostring(math.round((game.tick - scores[name].time)/60, 4))
                             game.print(name.." Has lapped in: "..time.." seconds. Lap "..laps[name].."/"..variables["laps"]..".")
-                            if  scores[name].total_time then
-                                scores[name].total_time = math.round(scores[name].total_time + (game.tick - scores[name].time)/60, 4)
+                            if  scores[name].totale_time then
+                                scores[name].totale_time = math.round(scores[name].totale_time + (game.tick - scores[name].time)/60, 4)
                             else
-                                scores[name].total_time = math.round((game.tick - scores[name].time)/60, 4)
+                                scores[name].totale_time = math.round((game.tick - scores[name].time)/60, 4)
                             end
-                            game.print(name.." Has finished "..variables["laps"].." laps in "..scores[name].total_time.." seconds".." placing them "..Nth(variables["place"])..".")
-                            scores["finished_times"][name] = {variables["place"], scores[name].total_time}
+                            game.print(name.." Has finshed "..variables["laps"].." laps in "..scores[name].totale_time.." seconds".." placing them "..Nth(variables["place"])..".")
+                            scores["finshed_times"][name] = {variables["place"], scores[name].totale_time}
                             variables["place"] = variables["place"] + 1
-                            if scores["finished"] then
-                                scores["finished"] =  scores["finished"] + 1
+                            if scores["finshed"] then
+                                scores["finshed"] =  scores["finshed"] + 1
                             else
-                                scores["finished"] = 1
+                                scores["finshed"] = 1
                             end
-                            if scores["finished"] >= #game.connected_players - variables["new_joins"] then
+                            if scores["finshed"] >= #game.connected_players - variables["new_joins"] then 
                                 Mini_games.stop_game()
                             end
                         end
-                        if not finished then
+                        if not finsihed then
                             local time = tostring(math.round((game.tick - scores[name].time)/60, 4))
-                            if scores[name].total_time then
-                                scores[name].total_time = scores[name].total_time + (game.tick - scores[name].time)/60
+                            if scores[name].totale_time then
+                                scores[name].totale_time = scores[name].totale_time + (game.tick - scores[name].time)/60
                             else
-                                scores[name].total_time =  (game.tick - scores[name].time)/60
+                                scores[name].totale_time =  (game.tick - scores[name].time)/60
                             end
                             scores[name].time = game.tick
                             game.print(name.." Has lapped in: "..time.." seconds. Lap "..laps[name].."/"..variables["laps"]..".")
@@ -353,7 +359,7 @@ end
 local stop_invins = function(name)
     variables["Dead_car"][name].car.destructible = true
     local player = variables["Dead_car"][name].player
-    player.character.destructible = true
+    player.character.destructible = true 
 end
 
 local kill_biters = function(name)
@@ -372,7 +378,9 @@ local function invisabilty(car, name)
 end
 
 local token_for_stop_invins = Token.register(stop_invins)
+
 local token_for_kill_biters = Token.register(kill_biters)
+
 
 local respawn_car = function(name)
     local player = variables["Dead_car"][name].player
@@ -412,7 +420,7 @@ local car_destroyed = function(event)
         variables["Dead_car"][name].position = dead_car.position
         variables["Dead_car"][name].orientation = dead_car.orientation
         variables["Dead_car"][name].group = Permission_Groups.get_group_from_player(player).name
-        player.character.destructible = false
+        player.character.destructible = false 
         Permission_Groups.set_player_group(player, "out_car")
         task.set_timeout_in_ticks(180, token_for_car, name)
         task.set_timeout_in_ticks(190, token_for_kill_biters, name)
@@ -420,12 +428,12 @@ local car_destroyed = function(event)
     end
 end
 
--- local player_invisabilty = function(event)
---     local entity = event.entity
---     if entity.player then
---         entity.health = 1000
---     end
--- end
+local player_invisabilty = function(event)
+    local entity = event.entity
+    if entity.player then
+        entity.health = 1000
+    end
+end
 
 local function back_in_car(event)
     local player = game.players[event.player_index]
@@ -441,31 +449,33 @@ local function player_join(event)
     local player = game.players[event.player_index]
     player.teleport({-85, -126}, "Race game")
     player.character.destroy()
-    variables["new_joins"] = variables["new_joins"] + 1
+    variables["new_joins"] = variables["new_joins"] + 1 
 
 end
+
 
 local function on_player_left_game(event)
     local player = game.players[event.player_index]
     if not start_players[player.name] then
         variables["new_joins"] = variables["new_joins"] - 1
     else
-        local name = player.name
+        local name = player.name 
         start_players[name] = nil
         scores[name] = nil
         player_progress[name] = nil
-        player.character.destructible = true
+        player.character.destructible = true 
 
     end
     if not player.character then
         player.create_character()
-    end
+    end 
     player.teleport({-35, 55}, "nauvis")
     if cars[player.name] then
         cars[player.name].destroy()
     end
 
 end
+
 
 race:add_map("Race game", -80, -140)
 race:add_start_function(start)
@@ -478,6 +488,8 @@ race:add_event(defines.events.on_player_joined_game, player_join)
 race:add_event(defines.events.on_pre_player_left_game, on_player_left_game)
 race:add_option(3)
 
+
+
 local function give_vars()
     return {
         surface=surface ,
@@ -489,8 +501,8 @@ local function give_vars()
         scores=scores,
         laps=laps,
         gate_boxes=gate_boxes,
-        start_players=start_players
+        start_players=start_players 
     }
 end
 
-interface.add_interface_callback('Race', function() return give_vars() end)
+interface.add_interface_callback('Race', function(player) return give_vars() end)
