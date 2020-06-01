@@ -2,8 +2,8 @@ return {
     {
         surface = "tigth_spot", --Name of the surface.
         level_number = 1, --Must be 1 higher then the last one.
-        time = 5 * 60, -- The time in tick 1 sec is 60 ticks.
-        play_time = 5 * 60, -- The time that the game plays when the player cant take action.
+        time = 5 * 60 * 60, -- The time in tick 1 sec is 60 ticks.
+        play_time = 10 * 60 * 60, -- The time that the game plays when the player cant take action.
         objective = "Iron gear", -- Non data.raw objective.
         money = { --The different tiers of money.
             easy = 10000,

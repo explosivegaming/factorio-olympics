@@ -232,7 +232,7 @@ local add_mini_game =
     function(_, parent, name)
         local vote_flow = parent.add {type = "flow", name = name}
         vote_flow.style.padding = 0
-        vote_button(vote_flow, name)
+        vote_button(vote_flow)
         parent.add {
             type = "label",
             caption = name,

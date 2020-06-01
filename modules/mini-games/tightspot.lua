@@ -16,7 +16,7 @@ save["entity"] = {}
 local game_gui
 local diffuclty
 local surface
-local tick 
+local tick
 local centers = {}
 local markets = {}
 local entities = {}
@@ -301,7 +301,7 @@ local function placed_entety(event)
         end
     end
 end
-local token_for_replace_wall 
+local token_for_replace_wall
 local function mined(event)
     local entity = event.entity
     if entity.type == "wall" then
@@ -438,7 +438,7 @@ local speed_slider
 local  function speed_change(player, element, event)
     local Main_gui = Gui.get_left_element(player, game_gui)
     local table = Main_gui.container["slider"].table
-    game.speed = table[speed_slider.name].slider_value 
+    game.speed = table[speed_slider.name].slider_value
 end
 --game gui
 
