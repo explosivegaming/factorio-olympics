@@ -12,7 +12,7 @@ local started_game = {}
 local Global = require 'utils.global' --Used to prevent desynicing.
 Global.register({
     started_game = started_game,
-}, function(tbl)
+},function(tbl)
     started_game = tbl.started_game
 end)
 
@@ -20,7 +20,7 @@ Mini_games["mini_games"] = {}
 Mini_games["_prototype"] = {}
 
 
-local function internal_error(success, error_message)
+local function internal_error(success,error_message)
     if not success and error_message then
         game.print("Their is an error please contact the admins, error: "..error_message)
         log(error_message)
@@ -49,14 +49,14 @@ function Mini_games.new_game(name)
 end
 
 
-function Mini_games._prototype:add_onth_tick(tick, func)
+function Mini_games._prototype:add_onth_tick(tick,func)
     local handler = Token.register(
         func
     )
-    self.onth_tick[#self.onth_tick+1] = {tick, handler}
+    self.onth_tick[#self.onth_tick+1] = {tick,handler}
 end
 
-function Mini_games._prototype:add_var(var, name)
+function Mini_games._prototype:add_var(var,name)
     self.vars[name] = var
 end
 
@@ -82,7 +82,7 @@ function Mini_games._prototype:add_command(command_name)
     self.commands[#self.commands + 1] = command_name
     Commands.disable(command_name)
 end
-function Mini_games._prototype:add_map(map, x,y)
+function Mini_games._prototype:add_map(map,x,y)
     --map is the name of surface to play the game on
     self.map = map
     self.positon.x = x
@@ -90,13 +90,13 @@ function Mini_games._prototype:add_map(map, x,y)
 end
 
 
-function Mini_games._prototype:add_event(event_name, func)
+function Mini_games._prototype:add_event(event_name,func)
     local handler = Token.register(func)
-    self.events[#self.events+1] = {handler, event_name}
+    self.events[#self.events+1] = {handler,event_name}
 end
 
 
-function Mini_games.start_game(name, ...)
+function Mini_games.start_game(name,...)
 
     local parse_args = {...}
     local mini_game = Mini_games.mini_games[name]
@@ -122,25 +122,25 @@ function Mini_games.start_game(name, ...)
 
 
     for i, player in ipairs(game.connected_players) do
-        game.connected_players[i].teleport({mini_game.positon.x, mini_game.positon.y}, mini_game.map)
+        game.connected_players[i].teleport({mini_game.positon.x,mini_game.positon.y},mini_game.map)
     end
 
     started_game[1] = name
     
-    for i, value  in ipairs(mini_game.events) do
+    for i,value  in ipairs(mini_game.events) do
         local handler = value[1]
         local event_name = value[2]
-        Event.add_removable(event_name, handler)
+        Event.add_removable(event_name,handler)
     end
 
-    for i, value  in ipairs(mini_game.onth_tick) do
+    for i,value  in ipairs(mini_game.onth_tick) do
         local tick = value[1]
         local token = value[2]
         Event.add_removable_nth_tick(tick, token)
     end
 
     if mini_game.commands then
-        for i, command_name  in ipairs(mini_game.commands) do
+        for i,command_name  in ipairs(mini_game.commands) do
             Commands.enable(command_name)
         end
     end
@@ -148,11 +148,11 @@ function Mini_games.start_game(name, ...)
     local start_func = mini_game.start_function
     if start_func then 
         if parse_args then
-            local success, err = pcall(start_func, parse_args)
-            internal_error(success, err)
+            local success, err = pcall(start_func,parse_args)
+            internal_error(success,err)
         else
             local success, err = pcall(start_func)
-            internal_error(success, err)
+            internal_error(success,err)
         end
     end
 end
@@ -163,30 +163,30 @@ function Mini_games.stop_game()
 
 
     started_game[1] = nil
-    for i, value  in ipairs(mini_game.events) do
+    for i,value  in ipairs(mini_game.events) do
         local handler = value[1]
         local event_name = value[2]
         Event.remove_removable(event_name, handler)
     end
 
-    for i, value  in ipairs(mini_game.onth_tick) do
+    for i,value  in ipairs(mini_game.onth_tick) do
         local tick = value[1]
         local token = value[2]
         Event.remove_removable_nth_tick(tick, token)
     end
 
     for i, player in ipairs(game.connected_players) do
-        game.connected_players[i].teleport({-35, 55}, "nauvis")
+        game.connected_players[i].teleport({-35,55},"nauvis")
     end
 
     local stop_func = mini_game.stop_function
     if stop_func then
         local success, err =  pcall(stop_func)
-        internal_error(success, err)
+        internal_error(success,err)
     end
 
     mini_game.vars = {} 
-    for i, command_name  in ipairs(mini_game.commands) do
+    for i,command_name  in ipairs(mini_game.commands) do
         Commands.disable(command_name)
     end
 
@@ -199,8 +199,8 @@ function Mini_games.error_in_game(error_game)
     game.print("an error has occured things may be broken, error: "..error_game)
 end
 local mini_game_list
-local on_vote_click = function (player, element, event)
-    --local frame = Gui.get_left_element(player, mini_game_list).container
+local on_vote_click = function (player,element,event)
+    --local frame = Gui.get_left_element(player,mini_game_list).container
     --local scroll = frame.scroll.table
     local caption = tonumber(element.parent.parent["edit-1"]["race"].caption)+1
     element.parent.parent["edit-1"]["race"].caption = tostring(caption)
@@ -217,7 +217,7 @@ Gui.element{
 
 
 local amount_label = 
-Gui.element(function(_, parent)
+Gui.element(function(_,parent)
 parent.add{
     type = "label",
     caption = '0',  
@@ -228,7 +228,7 @@ parent.add{
 end)
 
 local add_mini_game =
-Gui.element(function(_, parent)
+Gui.element(function(_,parent)
     local vote_flow = parent.add{ type = 'flow', }
     vote_flow.style.padding = 0
     vote_button(vote_flow)
@@ -237,7 +237,7 @@ Gui.element(function(_, parent)
         caption = 'Race game',
         style ="heading_1_label"
     }
-    local edit_flow = Gui.alignment(parent, 'edit-1')
+    local edit_flow = Gui.alignment(parent,'edit-1')
     edit_flow.style.right_padding = 15
     amount_label(edit_flow)
     
@@ -247,15 +247,15 @@ end)
 
 
 mini_game_list =
-Gui.element(function(event_trigger, parent, ...)
-    local container = Gui.container(parent, event_trigger, 200)
+Gui.element(function(event_trigger,parent,...)
+    local container = Gui.container(parent,event_trigger,200)
     local header = Gui.header(
         container,
         "Vote for the game",
         "You can vote here for you favorite game.",
         true
     )
-    local scroll_table = Gui.scroll_table(container, 250, 3,"thing")
+    local scroll_table = Gui.scroll_table(container,250,3,"thing")
     local scroll_table_style = scroll_table.style 
     scroll_table_style.top_cell_padding = 3
     scroll_table_style.bottom_cell_padding = 3
@@ -267,7 +267,7 @@ Gui.element(function(event_trigger, parent, ...)
     
 end)
 :add_to_left_flow(true)
-Gui.left_toolbar_button('entity/inserter', 'Nothing to see here', mini_game_list, function()  return true end)
+Gui.left_toolbar_button('entity/inserter','Nothing to see here',mini_game_list,function()  return true end)
 
 
 
@@ -278,7 +278,7 @@ Gui.element{
     type = 'button',
     caption = 'Example Button'
 }
-:on_click(function(player, element, event)
+:on_click(function(player,element,event)
     -- player is the player who interacted with the element to cause the event
     -- element is a refrence to the element which caused the event
      --event is a raw refrence to the event data if player and element are not enough

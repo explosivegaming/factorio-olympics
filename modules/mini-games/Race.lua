@@ -61,7 +61,7 @@ Global.register({
     laps = laps, --y 
     gate_boxes = gate_boxes, --y
     start_players = start_players --y
-}, function(tbl)
+},function(tbl)
     surface = tbl.surface
     gates = tbl.gates
     variables = tbl.variables
@@ -100,7 +100,7 @@ local function race_count_down()
     end
     if variables["count_down"] == 0 then
         game.print("[color=green]0 --> GO![/color]")
-        for i, player_name in pairs(start_players) do
+        for i,player_name in pairs(start_players) do
             local car = cars[player_name]
             car.get_fuel_inventory().insert({name = variables["fuel"], count = 100})   
             scores[player_name].time = game.tick
@@ -148,7 +148,7 @@ local start = function(args)
         variables["player"] =  #game.connected_players
     end
     --for i, player in ipairs(game.connected_players) do
-    for i=1, variables["player"] do
+    for i=1,variables["player"] do
         local player 
         if pick_all then
             player = game.connected_players[i]
@@ -225,7 +225,7 @@ local stop = function()
     for i, car in pairs(cars) do
         car.destroy()
     end
-    for i, player in ipairs(game.connected_players) do
+    for i,player in ipairs(game.connected_players) do
         if not player.character then
             player.create_character()
         end 
@@ -286,13 +286,13 @@ local player_move = function(event)
                         local car = cars[name]
                         if car then
                             if car.valid then
-                                car.teleport({276, -406})
+                                car.teleport({276,-406})
                                 car.orientation = 0.25
                                 player_progress[name] = 1
                                 player.print("[font=default-bold]YOU CAN'T TAKE A SHURTCUT, CHEATER![/font]")
                             end
                         else
-                            variables["Dead_car"][name].position = {276, -406}
+                            variables["Dead_car"][name].position = {276,-406}
                             variables["Dead_car"][name].orientation = 0.25
                             player.print("[font=default-bold]YOU CAN'T TAKE A SHURTCUT, CHEATER![/font]")
                         end
@@ -318,15 +318,15 @@ local player_move = function(event)
                                 player.character.destroy()
                             end
                             finsihed = true
-                            local time = tostring(math.round((game.tick - scores[name].time)/60, 4))
+                            local time = tostring(math.round((game.tick - scores[name].time)/60,4))
                             game.print(name.." Has lapped in: "..time.." seconds. Lap "..laps[name].."/"..variables["laps"]..".")
                             if  scores[name].totale_time then
-                                scores[name].totale_time = math.round(scores[name].totale_time + (game.tick - scores[name].time)/60, 4)
+                                scores[name].totale_time = math.round(scores[name].totale_time + (game.tick - scores[name].time)/60,4)
                             else
-                                scores[name].totale_time = math.round((game.tick - scores[name].time)/60, 4)
+                                scores[name].totale_time = math.round((game.tick - scores[name].time)/60,4)
                             end
                             game.print(name.." Has finshed "..variables["laps"].." laps in "..scores[name].totale_time.." seconds".." placing them "..Nth(variables["place"])..".")
-                            scores["finshed_times"][name] = {variables["place"], scores[name].totale_time}
+                            scores["finshed_times"][name] = {variables["place"],scores[name].totale_time}
                             variables["place"] = variables["place"] + 1
                             if scores["finshed"] then
                                 scores["finshed"] =  scores["finshed"] + 1
@@ -338,7 +338,7 @@ local player_move = function(event)
                             end
                         end
                         if not finsihed then
-                            local time = tostring(math.round((game.tick - scores[name].time)/60, 4))
+                            local time = tostring(math.round((game.tick - scores[name].time)/60,4))
                             if scores[name].totale_time then
                                 scores[name].totale_time = scores[name].totale_time + (game.tick - scores[name].time)/60
                             else
@@ -369,7 +369,7 @@ local kill_biters = function(name)
     end
 end
 
-local function invisabilty(car, name)
+local function invisabilty(car,name)
     car.destructible = false
     local biters = surface[1].find_enemy_units(variables["Dead_car"][name].position, 50, "player")
     for i, biter in ipairs(biters) do
@@ -397,7 +397,7 @@ local respawn_car = function(name)
     cars[name] = car
 
     Permission_Groups.set_player_group(player, variables["Dead_car"][name].group)
-    invisabilty(car, name)
+    invisabilty(car,name)
 
     variables["Dead_car"][name].car = car
 end
@@ -422,9 +422,9 @@ local car_destroyed = function(event)
         variables["Dead_car"][name].group = Permission_Groups.get_group_from_player(player).name
         player.character.destructible = false 
         Permission_Groups.set_player_group(player, "out_car")
-        task.set_timeout_in_ticks(180, token_for_car, name)
-        task.set_timeout_in_ticks(190, token_for_kill_biters, name)
-        task.set_timeout_in_ticks(480, token_for_stop_invins, name)
+        task.set_timeout_in_ticks(180, token_for_car,name)
+        task.set_timeout_in_ticks(190, token_for_kill_biters,name)
+        task.set_timeout_in_ticks(480, token_for_stop_invins,name)
     end
 end
 
@@ -447,7 +447,7 @@ end
 
 local function player_join(event)
     local player = game.players[event.player_index]
-    player.teleport({-85, -126}, "Race game")
+    player.teleport({-85, -126},"Race game")
     player.character.destroy()
     variables["new_joins"] = variables["new_joins"] + 1 
 
@@ -469,7 +469,7 @@ local function on_player_left_game(event)
     if not player.character then
         player.create_character()
     end 
-    player.teleport({-35, 55}, "nauvis")
+    player.teleport({-35,55},"nauvis")
     if cars[player.name] then
         cars[player.name].destroy()
     end
@@ -505,4 +505,4 @@ local function give_vars()
     }
 end
 
-interface.add_interface_callback('Race', function(player) return give_vars() end)
+interface.add_interface_callback('Race',function(player) return give_vars() end)
