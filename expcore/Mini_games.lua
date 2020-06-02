@@ -52,7 +52,7 @@ function Mini_games.new_game(name)
 end
 
 
-function Mini_games._prototype:add_onth_tick(tick,func)
+function Mini_games._prototype:add_on_nth_tick(tick,func)
     local handler = Token.register(
         func
     )
@@ -60,8 +60,7 @@ function Mini_games._prototype:add_onth_tick(tick,func)
 end
 
 
-
-function Mini_games._prototype:add_start_function(start_function)
+function Mini_games._prototype:set_start_function(start_function)
 
     self.start_function = start_function
 end
@@ -71,46 +70,43 @@ function Mini_games._prototype:add_option(amount)
 end
 
 
-function Mini_games._prototype:add_stop_function(stop_function)
-    self.stop_function = stop_function   
+function Mini_games._prototype:set_stop_function(stop_function)
+    self.stop_function = stop_function
 end
-function Mini_games._prototype:add_gui_element(gui_element)
-    self.gui = gui_element   
-end
-
-function Mini_games._prototype:add_gui_callback(callback)
-    self.gui_callback = callback   
+function Mini_games._prototype:set_gui_element(gui_element)
+    self.gui = gui_element
 end
 
+function Mini_games._prototype:set_gui_callback(callback)
+    self.gui_callback = callback
+end
 
 function Mini_games._prototype:add_command(command_name)
     self.commands[#self.commands + 1] = command_name
     Commands.disable(command_name)
 end
 function Mini_games._prototype:add_map(map,x,y)
-    --map is the name of surface to play the game on
     self.map = map
     self.positon.x = x
     self.positon.y = y
 end
-
 
 function Mini_games._prototype:add_event(event_name,func)
     local handler = Token.register(func)
     self.events[#self.events+1] = {handler,event_name}
 end
 
-
 function Mini_games.start_game(name,parse_args)
     local mini_game = Mini_games.mini_games[name]
     if mini_game == nil then
         return "This mini_game does not exsit"
     end
+
     if parse_args then
         if  mini_game.options ~= #parse_args then
             return "Wrong number of arguments"
         end
-    else 
+    else
         if mini_game.options ~= 0 then
             return "Wrong number of arguments"
         end
@@ -119,6 +115,7 @@ function Mini_games.start_game(name,parse_args)
     if started_game[1] == name then
         return "This game is already running"
     end
+
     if mini_game.map == nil then
         error("No map set")
     end
@@ -127,14 +124,12 @@ function Mini_games.start_game(name,parse_args)
         Mini_games.stop_game(started_game[1])
     end
 
-
-
-    for i, player in ipairs(game.connected_players) do
-        game.connected_players[i].teleport({mini_game.positon.x,mini_game.positon.y},mini_game.map)
+    for _, player in ipairs(game.connected_players) do
+        player.teleport({mini_game.positon.x,mini_game.positon.y},mini_game.map)
     end
 
     started_game[1] = name
-    
+
     for i,value  in ipairs(mini_game.events) do
         local handler = value[1]
         local event_name = value[2]
@@ -154,7 +149,7 @@ function Mini_games.start_game(name,parse_args)
     end
 
     local start_func = mini_game.start_function
-    if start_func then 
+    if start_func then
         if parse_args then
             local success, err = pcall(start_func,parse_args)
             internal_error(success,err)
@@ -183,7 +178,7 @@ function Mini_games.stop_game()
         Event.remove_removable_nth_tick(tick, token)
     end
 
-    for i, player in ipairs(game.connected_players) do
+    for i, _ in ipairs(game.connected_players) do
         game.connected_players[i].teleport({-35,55},"nauvis")
     end
 
@@ -193,26 +188,25 @@ function Mini_games.stop_game()
         internal_error(success,err)
     end
 
-    mini_game.vars = {} 
+    mini_game.vars = {}
     for i,command_name  in ipairs(mini_game.commands) do
         Commands.disable(command_name)
     end
+
     for i,player in ipairs(game.connected_players) do
         Gui.update_top_flow(player)
     end
-    
 
 end
 
 
 function Mini_games.error_in_game(error_game)
-    --error(error_game)   
     Mini_games.stop_game()
     game.print("an error has occured things may be broken, error: "..error_game)
 end
 local mini_game_list
 --gui
-local on_vote_click = function (player,element,event)
+local on_vote_click = function (player,element,_)
     local name = element.parent.name
     local scroll_table = element.parent.parent
     local mini_game = Mini_games.mini_games[name]
@@ -220,17 +214,14 @@ local on_vote_click = function (player,element,event)
     if mini_game.gui_callback then
         args = mini_game.gui_callback(scroll_table)
     end
-    --main_gui[1] = element.parent.parent.parent.parent.parent.parent
-    for i,player in ipairs(game.connected_players) do
-        main_gui[i] = Gui.get_left_element(player,mini_game_list)
-        Gui.toggle_left_element(player,main_gui[1],false)
+
+    for i,connected_player in ipairs(game.connected_players) do
+        main_gui[i] = Gui.get_left_element(connected_player,mini_game_list)
+        Gui.toggle_left_element(connected_player,main_gui[1],false)
     end
-    if args then
-        Mini_games.start_game(name,args)
-    else 
-        Mini_games.start_game(name)
-    end
-    Gui.update_top_flow(player) 
+
+    Mini_games.start_game(name,args)
+    Gui.update_top_flow(player)
 end
 
 
@@ -239,7 +230,7 @@ local vote_button =
 Gui.element{
     type = 'sprite-button',
     sprite = 'utility/check_mark',
-    style = 'quick_bar_slot_button',
+    style = 'slot_button',
 }
 :on_click(on_vote_click)
 
@@ -248,7 +239,7 @@ local add_mini_game =
 Gui.element(function(_,parent,name)
     local vote_flow = parent.add{ type = 'flow', name = name }
     vote_flow.style.padding = 0
-    vote_button(vote_flow,name)
+    vote_button(vote_flow)
     parent.add{
         type = "label",
         caption = name,
@@ -259,24 +250,22 @@ Gui.element(function(_,parent,name)
         mini_game.gui(parent)
     end
 end)
-  
+
 mini_game_list =
-Gui.element(function(event_trigger,parent,...)
+Gui.element(function(event_trigger,parent)
     local container = Gui.container(parent,event_trigger,200)
-    local header = Gui.header(
-        container,
-        "Start a game",
-        "You can start the game here.",
-        true
-    )
+
+    Gui.header(container,"Start a game","You can start the game here.",true)
+
     local scroll_table = Gui.scroll_table(container,250,3,"thing")
-    local scroll_table_style = scroll_table.style 
+    local scroll_table_style = scroll_table.style
     scroll_table_style.top_cell_padding = 3
     scroll_table_style.bottom_cell_padding = 3
-    
-    for i,e in pairs(Mini_games.mini_games) do
-        add_mini_game(scroll_table,i) 
+
+    for i,_ in pairs(Mini_games.mini_games) do
+        add_mini_game(scroll_table,i)
     end
+
     return container.parent
 end)
 :add_to_left_flow(false)
