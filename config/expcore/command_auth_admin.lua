@@ -5,7 +5,8 @@
 
 local Commands = require 'expcore.commands' --- @dep expcore.commands
 
-Commands.add_authenticator(function(player,command,tags,reject)
+-- luacheck:ignore 212/command
+Commands.add_authenticator(function(player, command, tags, reject)
     if tags.admin_only then
         if player.admin then
             return true
