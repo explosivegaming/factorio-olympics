@@ -69,6 +69,7 @@ Roles.new_role('Moderator','Mod')
     'command/add',
     'command/dump',
     'command/set',
+    'command/connect'
 }
 
 Roles.new_role('Trainee','TrMod')
