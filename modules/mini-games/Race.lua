@@ -4,6 +4,7 @@ local task              = require "utils.task"
 local Permission_Groups = require "expcore.permission_groups"
 local Global            = require 'utils.global' --Used to prevent desynicing.
 local interface         = require 'modules.commands.interface'
+local Gui               = require 'expcore.gui._require'
 local surface = {}
 local gates = {}
 local areas = {}
@@ -51,16 +52,16 @@ Permission_Groups.new_group('out_car')
 
 
 Global.register({
-    surface = surface, --y
-    gates = gates, --y
-    variables = variables, --y
-    areas = areas, --y
-    player_progress = player_progress, --y
-    cars = cars, --y
-    scores = scores, --y
-    laps = laps, --y 
-    gate_boxes = gate_boxes, --y
-    start_players = start_players --y
+    surface = surface,
+    gates = gates,
+    variables = variables,
+    areas = areas,
+    player_progress = player_progress,
+    cars = cars,
+    scores = scores,
+    laps = laps,
+    gate_boxes = gate_boxes,
+    start_players = start_players
 },function(tbl)
     surface = tbl.surface
     gates = tbl.gates
@@ -72,12 +73,11 @@ Global.register({
     laps = tbl.laps
     gate_boxes = tbl.gate_boxes
     start_players = tbl.start_players
-    
 end)
 
 local function reset_table(table)
-    for i, value in pairs(table) do
-        table[i] = nil
+    for k in pairs(table) do
+        table[k] = nil
     end
 end
 
@@ -90,10 +90,9 @@ local function resetall()
     reset_table(laps)
     reset_table(start_players)
 end
-local token_for_start 
+local token_for_start
 
 local function race_count_down()
-    
     variables["count_down"]  = variables["count_down"]  -1
     if  variables["count_down"] ~= 0 then
         game.print("[color=red]"..variables["count_down"].."[/color]")
@@ -102,7 +101,7 @@ local function race_count_down()
         game.print("[color=green]0 --> GO![/color]")
         for i,player_name in pairs(start_players) do
             local car = cars[player_name]
-            car.get_fuel_inventory().insert({name = variables["fuel"], count = 100})   
+            car.get_fuel_inventory().insert({name = variables["fuel"], count = 100})
             scores[player_name].time = game.tick
         end
     else
@@ -115,15 +114,13 @@ local function pick_player()
     local player = game.connected_players[math.random(#game.connected_players)]
     if not start_players[player.name] then
         return player
-    else 
+    else
         return  pick_player()
     end
 end
 
 
 local start = function(args)
-    
-
     surface[1] = game.surfaces["Race game"]
     variables["done_left"] = 0
     variables["count_down"] = 4
@@ -136,7 +133,7 @@ local start = function(args)
     variables["place"] = 1
     variables["new_joins"] = 0
     scores["finshed_times"] = {}
-    if not variables["laps"] then 
+    if not variables["laps"] then
         variables["error_game"] = "No laps set"
     end
     if not game.item_prototypes[variables["fuel"]] then
@@ -149,13 +146,13 @@ local start = function(args)
     end
     --for i, player in ipairs(game.connected_players) do
     for i=1,variables["player"] do
-        local player 
+        local player
         if pick_all then
             player = game.connected_players[i]
         else
             player = pick_player()
         end
-        start_players[player.name] = player.name 
+        start_players[player.name] = player.name
         local pos
         if (variables["left"]) then
             pos = {-85, -126 + variables["done_left"] * 5}
@@ -187,15 +184,14 @@ local start = function(args)
 
     for i, player in ipairs(game.connected_players) do
         if not  start_players[player.name]  then
-            local player = game.players[player.name]
             player.character.destroy()
-            variables["new_joins"] = variables["new_joins"] + 1   
+            variables["new_joins"] = variables["new_joins"] + 1
         end
     end
-    local laps = variables["laps"]
+    local Amount_laps = variables["laps"]
     game.print("[color=#39ff14]Race started![/color]")
     game.print("[color=#39ff14]Racing in a car with "..variables["fuel"]..".[/color]")
-    game.print("[color=#39ff14]Laps: "..laps..".[/color]")
+    game.print("[color=#39ff14]Laps: "..Amount_laps..".[/color]")
     task.set_timeout_in_ticks(10, token_for_start)
     setup_areas()
 
@@ -205,8 +201,6 @@ local start = function(args)
         Mini_games.error_in_game(variables["error_game"])
     end
 
-
-    
 end
 --@author https://rosettacode.org/wiki/N%27th#Lua
 local function getSuffix (n)
@@ -217,7 +211,7 @@ local function getSuffix (n)
     if lastOne == 3 then return "rd" end
     return "th"
 end
- 
+
 local function Nth (n) return n..getSuffix(n) end
 
 --@author tovernaar123
@@ -228,7 +222,7 @@ local stop = function()
     for i,player in ipairs(game.connected_players) do
         if not player.character then
             player.create_character()
-        end 
+        end
     end
     local colors =  {
         ["1st"] = "[color=#FFD700]",
@@ -236,9 +230,8 @@ local stop = function()
         ["3rd"] = "[color=#cd7f32]"
     }
     for i, value in pairs(scores["finshed_times"]) do
-        local place = value[1]
         local time = value[2]
-        local place = Nth(place)
+        local place = Nth(value[1])
         if colors[place] then
             game.print(colors[place]..place..": "..i.." with "..time.." seconds.[/color]")
         else
@@ -271,7 +264,7 @@ local player_move = function(event)
                 if i ~= 5 then
                     if progress == i or progress - 1 == i then
                         found_match = true
-                        for i, gate in ipairs(gates[i]) do
+                        for _, gate in ipairs(gates[i]) do
                             gate.request_to_open(gate.force, 100)
                         end
                         if progress == i and progress ~= 5 then
@@ -282,7 +275,7 @@ local player_move = function(event)
             end
             if not found_match then
                 if insideBox(gate_boxes[4], pos) then
-                    if player_progress[name] < 5 then 
+                    if player_progress[name] < 5 then
                         local car = cars[name]
                         if car then
                             if car.valid then
@@ -302,16 +295,16 @@ local player_move = function(event)
         end
         if not found_match then
             if insideBox(variables["finsih"], pos) then
-                if player_progress[name] then 
+                if player_progress[name] then
                     if player_progress[name] == 5 then
                         player_progress[name] = 1
                         if laps[name] then
                             laps[name] = laps[name] + 1
                         else
-                            laps[name] = 1 
+                            laps[name] = 1
                         end
                         local finsihed = false
-                        if laps[name] >= variables["laps"] then 
+                        if laps[name] >= variables["laps"] then
                             cars[name].destroy()
                             cars[name] = nil
                             if player.character then
@@ -333,7 +326,7 @@ local player_move = function(event)
                             else
                                 scores["finshed"] = 1
                             end
-                            if scores["finshed"] >= #game.connected_players - variables["new_joins"] then 
+                            if scores["finshed"] >= #game.connected_players - variables["new_joins"] then
                                 Mini_games.stop_game()
                             end
                         end
@@ -359,7 +352,7 @@ end
 local stop_invins = function(name)
     variables["Dead_car"][name].car.destructible = true
     local player = variables["Dead_car"][name].player
-    player.character.destructible = true 
+    player.character.destructible = true
 end
 
 local kill_biters = function(name)
@@ -420,7 +413,7 @@ local car_destroyed = function(event)
         variables["Dead_car"][name].position = dead_car.position
         variables["Dead_car"][name].orientation = dead_car.orientation
         variables["Dead_car"][name].group = Permission_Groups.get_group_from_player(player).name
-        player.character.destructible = false 
+        player.character.destructible = false
         Permission_Groups.set_player_group(player, "out_car")
         task.set_timeout_in_ticks(180, token_for_car,name)
         task.set_timeout_in_ticks(190, token_for_kill_biters,name)
@@ -428,12 +421,7 @@ local car_destroyed = function(event)
     end
 end
 
-local player_invisabilty = function(event)
-    local entity = event.entity
-    if entity.player then
-        entity.health = 1000
-    end
-end
+
 
 local function back_in_car(event)
     local player = game.players[event.player_index]
@@ -449,7 +437,7 @@ local function player_join(event)
     local player = game.players[event.player_index]
     player.teleport({-85, -126},"Race game")
     player.character.destroy()
-    variables["new_joins"] = variables["new_joins"] + 1 
+    variables["new_joins"] = variables["new_joins"] + 1
 
 end
 
@@ -459,16 +447,16 @@ local function on_player_left_game(event)
     if not start_players[player.name] then
         variables["new_joins"] = variables["new_joins"] - 1
     else
-        local name = player.name 
+        local name = player.name
         start_players[name] = nil
         scores[name] = nil
         player_progress[name] = nil
-        player.character.destructible = true 
+        player.character.destructible = true
 
     end
     if not player.character then
         player.create_character()
-    end 
+    end
     player.teleport({-35,55},"nauvis")
     if cars[player.name] then
         cars[player.name].destroy()
@@ -477,15 +465,71 @@ local function on_player_left_game(event)
 end
 
 
+--gui
+local dorpdown =
+Gui.element{
+    type = 'drop-down',
+    items = {"nuclear-fuel","wood","coal","solid-fuel","rocket-fuel"},
+    selected_index = 1
+}
+local text_field_for_laps =
+Gui.element{
+    type = 'textfield',
+    text  = "1",
+    numeric = true,
+}
+:style{
+  width = 25
+}
+local text_field_for_players =
+Gui.element{
+    type = 'textfield',
+    text  = "1",
+    numeric = true,
+}
+:style{
+  width = 25
+}
+
+local maingui =
+Gui.element(function(_,parent)
+    local main_flow = parent.add{ type = 'flow', name = "Race_flow"}
+
+    dorpdown(main_flow)
+
+    text_field_for_laps(main_flow)
+
+    text_field_for_players(main_flow)
+
+end)
+local function gui_callback(parent)
+    local args = {}
+    local flow = parent["Race_flow"]
+
+    local dorpdown_ = flow[dorpdown.name]
+
+    local fuel = dorpdown_.get_item(dorpdown_.selected_index)
+    args[1] = fuel
+
+    local required_laps = flow[text_field_for_laps.name].text
+    args[2] = required_laps
+
+    local players = flow[text_field_for_players.name].text
+    args[3] = players
+
+    return args
+end
+
 race:add_map("Race game", -80, -140)
-race:add_start_function(start)
-race:add_stop_function(stop)
---race:add_event(defines.events.on_entity_damaged, player_invisabilty)
+race:set_start_function(start)
+race:set_stop_function(stop)
 race:add_event(defines.events.on_player_changed_position, player_move)
 race:add_event(defines.events.on_entity_died, car_destroyed)
 race:add_event(defines.events.on_player_driving_changed_state, back_in_car)
 race:add_event(defines.events.on_player_joined_game, player_join)
 race:add_event(defines.events.on_pre_player_left_game, on_player_left_game)
+race:set_gui_element(maingui)
+race:set_gui_callback(gui_callback)
 race:add_option(3)
 
 
@@ -501,8 +545,8 @@ local function give_vars()
         scores=scores,
         laps=laps,
         gate_boxes=gate_boxes,
-        start_players=start_players 
+        start_players=start_players
     }
 end
 
-interface.add_interface_callback('Race',function(player) return give_vars() end)
+interface.add_interface_callback('Race',function() return give_vars() end)

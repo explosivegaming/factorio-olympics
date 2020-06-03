@@ -3,17 +3,20 @@ local Event = require 'utils.event'
 local Commands = require 'expcore.commands'
 local Gui = require 'expcore.gui._require'
 require 'config.expcore.command_runtime_disable' --required to load befor running the script
+local Roles = require 'expcore.roles' --- @dep expcore.roles
 
 
 local Mini_games = {}
-
+local main_gui = {}
 local started_game = {}
 
 local Global = require 'utils.global' --Used to prevent desynicing.
 Global.register({
     started_game = started_game,
+    main_gui = main_gui,
 },function(tbl)
     started_game = tbl.started_game
+    main_gui = tbl.main_gui
 end)
 
 Mini_games["mini_games"] = {}
@@ -38,9 +41,9 @@ function Mini_games.new_game(name)
         stop_function = nil,
         map = nil,
         positon = {},
-        vars = {},
-        vars_2 = {},
         options = 0,
+        gui = nil,
+        gui_callback = nil,
     }, {
         __index= Mini_games._prototype
     })
@@ -49,22 +52,15 @@ function Mini_games.new_game(name)
 end
 
 
-function Mini_games._prototype:add_onth_tick(tick,func)
+function Mini_games._prototype:add_on_nth_tick(tick,func)
     local handler = Token.register(
         func
     )
     self.onth_tick[#self.onth_tick+1] = {tick,handler}
 end
 
-function Mini_games._prototype:add_var(var,name)
-    self.vars[name] = var
-end
 
-function Mini_games._prototype:add_var_global(var)
-    self.vars_2[#self.vars_2 + 1] = var
-end
-
-function Mini_games._prototype:add_start_function(start_function)
+function Mini_games._prototype:set_start_function(start_function)
 
     self.start_function = start_function
 end
@@ -74,8 +70,15 @@ function Mini_games._prototype:add_option(amount)
 end
 
 
-function Mini_games._prototype:add_stop_function(stop_function)
-    self.stop_function = stop_function   
+function Mini_games._prototype:set_stop_function(stop_function)
+    self.stop_function = stop_function
+end
+function Mini_games._prototype:set_gui_element(gui_element)
+    self.gui = gui_element
+end
+
+function Mini_games._prototype:set_gui_callback(callback)
+    self.gui_callback = callback
 end
 
 function Mini_games._prototype:add_command(command_name)
@@ -83,34 +86,36 @@ function Mini_games._prototype:add_command(command_name)
     Commands.disable(command_name)
 end
 function Mini_games._prototype:add_map(map,x,y)
-    --map is the name of surface to play the game on
     self.map = map
     self.positon.x = x
     self.positon.y = y
 end
-
 
 function Mini_games._prototype:add_event(event_name,func)
     local handler = Token.register(func)
     self.events[#self.events+1] = {handler,event_name}
 end
 
-
-function Mini_games.start_game(name,...)
-
-    local parse_args = {...}
+function Mini_games.start_game(name,parse_args)
     local mini_game = Mini_games.mini_games[name]
     if mini_game == nil then
         return "This mini_game does not exsit"
     end
 
-    if  mini_game.options ~= #parse_args then
-        return "Wrong number of arguments"
+    if parse_args then
+        if  mini_game.options ~= #parse_args then
+            return "Wrong number of arguments"
+        end
+    else
+        if mini_game.options ~= 0 then
+            return "Wrong number of arguments"
+        end
     end
 
     if started_game[1] == name then
         return "This game is already running"
     end
+
     if mini_game.map == nil then
         error("No map set")
     end
@@ -119,14 +124,12 @@ function Mini_games.start_game(name,...)
         Mini_games.stop_game(started_game[1])
     end
 
-
-
-    for i, player in ipairs(game.connected_players) do
-        game.connected_players[i].teleport({mini_game.positon.x,mini_game.positon.y},mini_game.map)
+    for _, player in ipairs(game.connected_players) do
+        player.teleport({mini_game.positon.x,mini_game.positon.y},mini_game.map)
     end
 
     started_game[1] = name
-    
+
     for i,value  in ipairs(mini_game.events) do
         local handler = value[1]
         local event_name = value[2]
@@ -146,7 +149,7 @@ function Mini_games.start_game(name,...)
     end
 
     local start_func = mini_game.start_function
-    if start_func then 
+    if start_func then
         if parse_args then
             local success, err = pcall(start_func,parse_args)
             internal_error(success,err)
@@ -175,8 +178,8 @@ function Mini_games.stop_game()
         Event.remove_removable_nth_tick(tick, token)
     end
 
-    for i, player in ipairs(game.connected_players) do
-        game.connected_players[i].teleport({-35,55},"nauvis")
+    for _, player in ipairs(game.connected_players) do
+        player.teleport({-35,55},"nauvis")
     end
 
     local stop_func = mini_game.stop_function
@@ -185,89 +188,89 @@ function Mini_games.stop_game()
         internal_error(success,err)
     end
 
-    mini_game.vars = {} 
+    mini_game.vars = {}
     for i,command_name  in ipairs(mini_game.commands) do
         Commands.disable(command_name)
+    end
+
+    for i,player in ipairs(game.connected_players) do
+        Gui.update_top_flow(player)
     end
 
 end
 
 
 function Mini_games.error_in_game(error_game)
-    --error(error_game)   
     Mini_games.stop_game()
     game.print("an error has occured things may be broken, error: "..error_game)
 end
 local mini_game_list
-local on_vote_click = function (player,element,event)
-    --local frame = Gui.get_left_element(player,mini_game_list).container
-    --local scroll = frame.scroll.table
-    local caption = tonumber(element.parent.parent["edit-1"]["race"].caption)+1
-    element.parent.parent["edit-1"]["race"].caption = tostring(caption)
+--gui
+local on_vote_click = function (player,element,_)
+    local name = element.parent.name
+    local scroll_table = element.parent.parent
+    local mini_game = Mini_games.mini_games[name]
+    local args
+    if mini_game.gui_callback then
+        args = mini_game.gui_callback(scroll_table)
+    end
+
+    for i,connected_player in ipairs(game.connected_players) do
+        main_gui[i] = Gui.get_left_element(connected_player,mini_game_list)
+        Gui.toggle_left_element(connected_player,main_gui[1],false)
+    end
+
+    Mini_games.start_game(name,args)
+    Gui.update_top_flow(player)
 end
+
 
 
 local vote_button =
 Gui.element{
     type = 'sprite-button',
     sprite = 'utility/check_mark',
-    style = 'quick_bar_slot_button',   
+    style = 'slot_button',
 }
 :on_click(on_vote_click)
 
 
-local amount_label = 
-Gui.element(function(_,parent)
-parent.add{
-    type = "label",
-    caption = '0',  
-    style ="heading_1_label",
-    name = "race"
-}
-    
-end)
-
 local add_mini_game =
-Gui.element(function(_,parent)
-    local vote_flow = parent.add{ type = 'flow', }
+Gui.element(function(_,parent,name)
+    local vote_flow = parent.add{ type = 'flow', name = name }
     vote_flow.style.padding = 0
     vote_button(vote_flow)
     parent.add{
         type = "label",
-        caption = 'Race game',
+        caption = name,
         style ="heading_1_label"
     }
-    local edit_flow = Gui.alignment(parent,'edit-1')
-    edit_flow.style.right_padding = 15
-    amount_label(edit_flow)
-    
-
+    local mini_game = Mini_games.mini_games[name]
+    if mini_game.gui then
+        mini_game.gui(parent)
+    end
 end)
-
-
 
 mini_game_list =
-Gui.element(function(event_trigger,parent,...)
+Gui.element(function(event_trigger,parent)
     local container = Gui.container(parent,event_trigger,200)
-    local header = Gui.header(
-        container,
-        "Vote for the game",
-        "You can vote here for you favorite game.",
-        true
-    )
+
+    Gui.header(container,"Start a game","You can start the game here.",true)
+
     local scroll_table = Gui.scroll_table(container,250,3,"thing")
-    local scroll_table_style = scroll_table.style 
+    local scroll_table_style = scroll_table.style
     scroll_table_style.top_cell_padding = 3
     scroll_table_style.bottom_cell_padding = 3
-    add_mini_game(scroll_table)
-    --add_mini_game(scroll_table)
-    
 
+    for name in pairs(Mini_games.mini_games) do
+        add_mini_game(scroll_table,name)
+    end
 
-    
+    return container.parent
 end)
-:add_to_left_flow(true)
-Gui.left_toolbar_button('entity/inserter','Nothing to see here',mini_game_list,function()  return true end)
+:add_to_left_flow(false)
+
+Gui.left_toolbar_button('utility/check_mark','Nothing to see here',mini_game_list,function(player)  return Roles.player_allowed(player,'gui/game_start') and not started_game[1] end)
 
 
 
@@ -289,4 +292,6 @@ Gui.left_toolbar_button('entity/inserter', 'Nothing to see here', example_button
 
 --left_toolbar_button
 ]]
+
+
 return Mini_games
