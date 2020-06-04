@@ -469,6 +469,12 @@ local function market(event)
     local player = game.players[event.player_index]
     Store.set(balances,player,player.get_item_count("coin"))
 end
+
+local function player_move(event)
+    local player = game.players[event.player_index]
+    player.print(serpent.block(level.area))
+end
+
 --gui
 local speed_slider
 local  function speed_change(player, _, _)
@@ -598,6 +604,7 @@ end
 tight:add_event(defines.events.on_built_entity, placed_entety)
 tight:add_event(defines.events.on_market_item_purchased, market)
 tight:add_event(defines.events.on_player_mined_entity, mined)
+tight:add_event(defines.events.on_player_changed_position, player_move)
 tight:add_on_nth_tick(100, check_chest)
 tight:add_on_nth_tick(60, timer)
 
