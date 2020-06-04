@@ -22,6 +22,8 @@ local markets = {}
 local entities = {}
 local started = {}
 local chests = {}
+local islands = {}
+
 
 local tightspot_prices = {
     ["coal"] = 5,
@@ -133,9 +135,16 @@ local function player_join_game(player,at_player)
     table["prices"].caption = level.demand.price
 
     --island
-    local area = level.area
+    local area = {}
+    area[1] = {}
+    area[2] = {}
+    area[1][1] = level.area[1][1]
+    area[1][2] = level.area[1][2]
+    area[2][1] = level.area[2][1]
+    area[2][2] = level.area[2][2]
     area[1][1] = area[1][1] +  at_player * 500
     area[2][1] = area[2][1] +  at_player * 500
+    islands[player.name] = area
     local left_overs = surface.find_entities_filtered {area= area}
     for i, ent in ipairs(left_overs) do
         if ent.name ~= "market" and ent.name ~= "steel-chest" then
@@ -165,15 +174,18 @@ local function player_join_game(player,at_player)
         local ent = surface.create_entity{name = name , position = position , force = force }
         ent.minable = minable
     end
-    centers[player.name] = level.center
-    centers[player.name].x = level.center.x +  at_player * 500
+    centers[player.name] = {}
+    centers[player.name].x = level.center.x
+    centers[player.name].y = level.center.y
+    centers[player.name].x =  centers[player.name].x + at_player * 500
     walls[player.name] = {}
     local wal = surface.find_entities_filtered {name = "stone-wall", area= area}
     for i,wall in ipairs(wal) do
         local p = wall.position
         walls[player.name][p.x..','..p.y] = true
     end
-
+    local center = centers[player.name]
+    player.teleport({center.x,center.y},level.surface)
 end
 
 
@@ -272,7 +284,19 @@ local function reset_table(table)
     end
 end
 
+local function getSuffix (n)
+    local lastTwo, lastOne = n % 100, n % 10
+    if lastTwo > 3 and lastTwo < 21 then return "th" end
+    if lastOne == 1 then return "st" end
+    if lastOne == 2 then return "nd" end
+    if lastOne == 3 then return "rd" end
+    return "th"
+end
+
+local function Nth (n) return n..getSuffix(n) end
+
 local function stop()
+    game.speed = 1
     for i,player in ipairs(game.connected_players) do
         player.set_controller {type = defines.controllers.god}
         player.create_character()
@@ -300,13 +324,34 @@ local function stop()
         local minable = entity[4]
         position.x = position.x
         entity[2].x = position.x
-        game.print(name)
-        game.print(position)
-        game.print(force)
         local ent = surface.create_entity{name = name , position = position , force = force }
         ent.minable = minable
     end
-
+    local players = {}
+    for name,_ in pairs(centers) do
+        players[#players+1] = name
+    end
+    local scores = {}
+    for _,name in ipairs(players) do
+        local player = game.players[name]
+        scores[#scores+1] = {Store.get(balances,player),name}
+    end
+    local colors =  {
+        ["1st"] = "[color=#FFD700]",
+        ["2nd"] = "[color=#C0C0C0]",
+        ["3rd"] = "[color=#cd7f32]"
+    }
+    table.sort(scores,function(a,b) return a[1] > b[1] end)
+    for i, score in ipairs(scores) do
+        local money = score[1]
+        local player_name = score[2]
+        local place = Nth(i)
+        if colors[place] then
+            game.print(colors[place]..place..": "..player_name.." with "..money.." points.[/color]")
+        else
+            game.print("[color=#808080]"..place..": "..player_name.." with "..money.." points.[/color]")
+        end
+    end
     reset_table(centers)
     reset_table(markets)
     reset_table(entities)
@@ -387,7 +432,6 @@ local function start_game()
         local result = balance - Debt
         Store.set(balances,player,result)
         table["Debt"].caption = "0"
-        game.print(SecondsToClock(level.play_time/60))
         table["Time"].caption = SecondsToClock(level.play_time/60)
 
         if Roles.player_allowed(player, 'gui/tightspot_speed') then
@@ -470,9 +514,27 @@ local function market(event)
     Store.set(balances,player,player.get_item_count("coin"))
 end
 
+local function insideBox(box, pos)
+    local x1 = box[1][1]
+    local y1 = box[1][2]
+    local x2 = box[2][1]
+    local y2 = box[2][2]
+
+    local px = pos.x
+    local py = pos.y
+    return px >= x1 and px <= x2 and py >= y1 and py <= y2
+end
+
 local function player_move(event)
     local player = game.players[event.player_index]
-    player.print(serpent.block(level.area))
+    local center = centers[player.name]
+    if center then
+        local pos = player.position
+        local area = islands[player.name]
+        if not insideBox(area,pos) then
+            player.teleport({center.x,center.y})
+        end
+    end
 end
 
 --gui
