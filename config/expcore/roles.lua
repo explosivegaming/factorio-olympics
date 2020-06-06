@@ -21,44 +21,40 @@ Roles.new_role('System','SYS')
 :set_permission_group('Admin')
 :set_flag('is_admin')
 :set_flag('is_spectator')
-:set_flag('report-immune')
-:set_flag('instance-respawn')
 :set_allow_all()
 
-Roles.new_role('Senior Administrator','SAdmin')
+Roles.new_role('Organizer','Organizer')
 :set_permission_group('Admin')
+:set_custom_color{r=155,g=89,b=182}
 :set_flag('is_admin')
 :set_flag('is_spectator')
-:set_flag('report-immune')
-:set_flag('instance-respawn')
-:set_parent('Administrator')
+:set_parent('Developer')
+:allow{
+}
+
+Roles.new_role('Developer','Dev')
+:set_permission_group('Admin')
+:set_custom_color{r=230,g=126,b=34}
+:set_flag('is_admin')
+:set_flag('is_spectator')
+:set_parent('Official')
 :allow{
     'command/interface',
     'command/debug',
 }
 
-Roles.new_role('Administrator','Admin')
+Roles.new_role('Official','Official')
 :set_permission_group('Admin')
-:set_custom_color{r=233,g=63,b=233}
+:set_custom_color{r=52,g=152,b=219}
 :set_flag('is_admin')
 :set_flag('is_spectator')
-:set_flag('report-immune')
-:set_flag('instance-respawn')
-:set_parent('Moderator')
-:allow{
-}
-
-Roles.new_role('Moderator','Mod')
-:set_permission_group('Admin')
-:set_custom_color{r=0,g=170,b=0}
-:set_flag('is_admin')
-:set_flag('is_spectator')
-:set_flag('report-immune')
-:set_flag('instance-respawn')
-:set_parent('Trainee')
+:set_parent('Partner')
 :allow{
     'command/assign-role',
     'command/unassign-role',
+    'command/admin-chat',
+    'command/kick',
+    'command/ban',
     'command/win',
     'command/test',
     'command/hi',
@@ -72,97 +68,30 @@ Roles.new_role('Moderator','Mod')
     'command/set',
 }
 
-Roles.new_role('Trainee','TrMod')
-:set_permission_group('Admin')
-:set_custom_color{r=0,g=170,b=0}
-:set_flag('is_admin')
-:set_flag('is_spectator')
-:set_flag('report-immune')
-:set_parent('Veteran')
-:allow{
-    'command/admin-chat',
-    'command/kick',
-    'command/ban',
-}
-
 --- Trusted Roles
-Roles.new_role('Board Member','Board')
-:set_permission_group('Trusted')
-:set_custom_color{r=247,g=246,b=54}
-:set_flag('is_spectator')
-:set_flag('report-immune')
-:set_flag('instance-respawn')
-:set_parent('Sponsor')
-:allow{
-}
-
-Roles.new_role('Senior Backer','Backer')
-:set_permission_group('Trusted')
-:set_custom_color{r=238,g=172,b=44}
-:set_flag('is_spectator')
-:set_flag('report-immune')
-:set_flag('instance-respawn')
-:set_parent('Sponsor')
-:allow{
-}
-
-Roles.new_role('Sponsor','Spon')
-:set_permission_group('Trusted')
-:set_custom_color{r=238,g=172,b=44}
-:set_flag('is_spectator')
-:set_flag('report-immune')
-:set_flag('instance-respawn')
-:set_parent('Supporter')
-:allow{
-}
-
-Roles.new_role('Supporter','Sup')
-:set_permission_group('Trusted')
-:set_custom_color{r=230,g=99,b=34}
-:set_flag('is_spectator')
-:set_parent('Veteran')
-:allow{
-}
-
 Roles.new_role('Partner','Part')
 :set_permission_group('Trusted')
-:set_custom_color{r=140,g=120,b=200}
+:set_custom_color{r=241,g=196,b=15}
 :set_flag('is_spectator')
-:set_parent('Veteran')
+:set_parent('Participant')
 :allow{
 }
 
-Roles.new_role('Veteran','Vet')
+Roles.new_role('Team Leader','Leader')
 :set_permission_group('Trusted')
-:set_custom_color{r=140,g=120,b=200}
-:set_parent('Member')
+:set_custom_color{r=241,g=196,b=15}
+:set_flag('is_spectator')
+:set_parent('Participant')
 :allow{
 }
-:set_auto_assign_condition(function(player)
-    if player.online_time > 10*216000 then
-        return true
-    end
-end)
 
 --- Standard User Roles
-Roles.new_role('Member','Mem')
+Roles.new_role('Participant','Player')
 :set_permission_group('Standard')
 :set_custom_color{r=24,g=172,b=188}
-:set_parent('Regular')
-:allow{
-}
-
-Roles.new_role('Regular','Reg')
-:set_permission_group('Standard')
-:set_custom_color{r=79,g=155,b=163}
 :set_parent('Guest')
 :allow{
 }
-:set_auto_assign_condition(function(player)
-    if player.online_time > 3*216000 then
-        return true
-    end
-end)
 
 --- Guest/Default role
 local default = Roles.new_role('Guest','')
@@ -190,63 +119,32 @@ Roles.set_default('Guest')
 
 Roles.define_role_order{
     'System', -- Best to keep root at top
-    'Senior Administrator',
-    'Administrator',
-    'Moderator',
-    'Trainee',
-    'Board Member',
-    'Senior Backer',
-    'Sponsor',
-    'Supporter',
+    'Organizer',
+    'Developer',
+    'Official',
     'Partner',
-    'Veteran',
-    'Member',
-    'Regular',
+    'Team Leader',
+    'Participant',
     'Jail',
     'Guest' -- Default must be last if you want to apply restrictions to other roles
 }
 
 Roles.override_player_roles{
-    ["Cooldude2606"]={"Senior Administrator","Moderator","Senior Backer","Supporter"},
-    ["tovernaar123"]={"Senior Administrator"},
-    --["tovernaar1234"]={"Senior Administrator"},
-    ["arty714"]={"Senior Administrator","Senior Backer","Supporter"},
-    ["Drahc_pro"]={"Administrator","Moderator","Veteran","Member"},
-    ["mark9064"]={"Administrator","Moderator","Member"},
-    ["aldldl"]={"Administrator","Moderator","Senior Backer","Sponsor","Supporter","Member"},
+    ['arty714'] = {'Organizer'},
+    ['Cooldude2606'] = {'Organizer'},
+    ['Drahc_pro'] = {'Organizer'},
+    ['Poli'] = {'Organizer'},
+    ['psihius'] = {'Organizer'},
+    ['TheOrangeAngle'] = {'Organizer'},
 
-    ["ookl"]={"Moderator","Senior Backer","Sponsor","Supporter","Partner","Member"},
-    ["hamsterbryan"]={"Moderator","Senior Backer","Supporter","Member"},
-    ["M74132"]={"Moderator","Senior Backer","Sponsor","Supporter","Member"},
-    ["LoicB"]={"Moderator","Senior Backer","Supporter","Veteran","Member"},
-    ["UUBlueFire"]={"Moderator","Senior Backer","Supporter","Member"},
-
-    ["thadius856"]={"Moderator","Supporter","Member"},
-    ["XenoCyber"]={"Moderator","Supporter","Partner","Member"},
-    ["cydes"]={"Moderator","Supporter","Member"},
-    ["darklich14"]={"Moderator","Supporter","Member"},
-    ["SilentLog"]={"Moderator","Supporter","Member"},
-    ["freek18"]={"Moderator","Supporter","Member"},
-    ["porelos"]={"Moderator","Supporter","Member"},
-
-    ["7h3w1z4rd"]={"Moderator","Member"},
-    ["Windbomb"]={"Moderator","Member"},
-    ["Phoenix27833"]={"Moderator","Member"},
-    ["banakeg"]={"Moderator","Member"},
-    ["maplesyrup01"]={"Moderator","Member"},
-    ["FlipHalfling90"]={"Moderator","Member"},
-    ["Ruuyji"]={"Moderator","Member"},
-    ["Gizan"]={"Moderator"},
-    ["samy115"]={"Moderator","Member"},
-    ["Hobbitkicker"]={"Moderator","Member"},
-    ["facere"]={"Moderator","Member"},
-    ["whoami32"]={"Moderator","Member"},
-    ["NextIdea"]={"Moderator","Member"},
-    ["mafisch3"]={"Moderator","Member"},
-    ["Tcheko"]={"Moderator","Member"},
-    ["AssemblyStorm"]={"Moderator","Veteran","Member"},
-    ["connormkii"]={"Moderator","Veteran","Member"},
-    ["Koroto"]={"Moderator","Veteran","Member"},
-    ["scarbvis"]={"Moderator","Member"},
-    ["CmonMate497"]={"Moderator","Member"}
+    ['_reverend'] = {'Developer'},
+    ['diffiehellman'] = {'Developer'},
+    ['grilledham'] = {'Developer'},
+    ['Guillaume'] = {'Developer'},
+    ['happs'] = {'Developer'},
+    ['Jayefuu'] = {'Developer'},
+    ['MaX'] = {'Developer'},
+    ['SimonFlapse'] = {'Developer'},
+    ['TheKid'] = {'Developer'},
+    ['tovernaar123'] = {'Developer'},
 }

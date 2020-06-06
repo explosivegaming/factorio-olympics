@@ -1,8 +1,6 @@
 # Compiled Lua sources
 luac.out
 
-
-
 # Object files
 *.o
 *.os

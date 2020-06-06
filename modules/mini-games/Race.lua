@@ -76,8 +76,8 @@ Global.register({
 end)
 
 local function reset_table(table)
-    for i, _ in pairs(table) do
-        table[i] = nil
+    for k in pairs(table) do
+        table[k] = nil
     end
 end
 
@@ -511,8 +511,8 @@ local function gui_callback(parent)
     local fuel = dorpdown_.get_item(dorpdown_.selected_index)
     args[1] = fuel
 
-    local laps_ = flow[text_field_for_laps.name].text
-    args[2] = laps_
+    local required_laps = flow[text_field_for_laps.name].text
+    args[2] = required_laps
 
     local players = flow[text_field_for_players.name].text
     args[3] = players

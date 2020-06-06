@@ -1,0 +1,20 @@
+name: CI PR Checker
+
+on: pull_request
+
+jobs:
+  luacheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+
+      - name: Extract branch name
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_BASE_REF#refs/heads/})"
+        id: extract_branch
+
+      - name: Lint
+        uses: Roang-zero1/factorio-mod-luacheck@master
+        with:
+          luacheckrc_url: https://raw.githubusercontent.com/explosivegaming/factorio-olympics/${{ steps.extract_branch.outputs.branch }}/.luacheckrc

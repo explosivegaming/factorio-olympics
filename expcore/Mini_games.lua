@@ -181,8 +181,8 @@ function Mini_games.stop_game()
         Event.remove_removable_nth_tick(tick, token)
     end
 
-    for i, _ in ipairs(game.connected_players) do
-        game.connected_players[i].teleport({-35,55},"nauvis")
+    for _, player in ipairs(game.connected_players) do
+        player.teleport({-35,55},"nauvis")
     end
 
     local stop_func = mini_game.stop_function
@@ -265,8 +265,8 @@ Gui.element(function(event_trigger,parent)
     scroll_table_style.top_cell_padding = 3
     scroll_table_style.bottom_cell_padding = 3
 
-    for i,_ in pairs(Mini_games.mini_games) do
-        add_mini_game(scroll_table,i)
+    for name in pairs(Mini_games.mini_games) do
+        add_mini_game(scroll_table,name)
     end
 
     return container.parent
