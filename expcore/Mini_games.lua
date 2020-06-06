@@ -224,7 +224,9 @@ local on_vote_click = function (player,element,_)
     end
 
     Mini_games.start_game(name,args)
-    Gui.update_top_flow(player)
+    for i,connected_player in ipairs(game.connected_players) do
+        Gui.update_top_flow(connected_player)
+    end
 end
 
 

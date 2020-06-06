@@ -7,16 +7,13 @@ local config        = require "config.mini_games.tight_spot"
 local tight         = Mini_games.new_game("Tight_spot")
 local Store         = require 'expcore.store' --- @dep expcore.store
 local Roles         = require "expcore.roles" --- @dep expcore.roles
-local balances = Store.register(function(player) return player.name end)
+local balances      = Store.register(function(player) return player.name end)
 local walls = {}
-local level
 local save = {}
 save["tiles"] = {}
 save["entity"] = {}
 local game_gui
-local diffuclty
-local surface
-local tick
+local variables = {}
 local centers = {}
 local markets = {}
 local entities = {}
@@ -69,8 +66,31 @@ local tightspot_prices = {
     ["logistic-chest-requester"] = 50
 }
 
+Global.register({
+    centers     = centers,
+    markets     = markets,
+    entities    = entities,
+    started     = started,
+    chests      = chests,
+    islands     = islands,
+    walls       = walls,
+    variables   = variables,
+    save        = save,
+},function(tbl)
+    centers     = tbl.centers
+    markets     = tbl.markets
+    entities    = tbl.entities
+    started     = tbl.started
+    chests      = tbl.chests
+    islands     = tbl.islands
+    walls       = tbl.walls
+    variables   = tbl.variables
+    save        = tbl.save
+end)
+
+
 local function land_price(player, position)
-    return math.abs(position.x - centers[player.name].x) + math.abs(position.y - centers[player.name].y) + level.starting_land_prize
+    return math.abs(position.x - centers[player.name].x) + math.abs(position.y - centers[player.name].y) + variables.level.starting_land_prize
 end
 
 local function SecondsToClock(seconds)
@@ -111,8 +131,8 @@ end
 
 local function player_join_game(player,at_player)
     --coins and random stuffs
-
-    Store.set(balances,player,diffuclty)
+    local level = variables.level
+    Store.set(balances,player,variables.diffuclty)
     local character = player.character
     player.set_controller {type = defines.controllers.god}
     if character then
@@ -120,14 +140,14 @@ local function player_join_game(player,at_player)
     end
     local playerforce = player.force
     playerforce.manual_mining_speed_modifier = 1000
-    player.insert {name = "coin", count = diffuclty}
+    player.insert {name = "coin", count = variables.diffuclty}
 
     --gui
 
     local Main_gui = Gui.get_left_element(player, game_gui)
     Gui.toggle_left_element(player,  Main_gui, true)
     local table = Main_gui.container["Money"].table
-    table["Balance"].caption = diffuclty
+    table["Balance"].caption = variables.diffuclty
     table["Time"].caption = SecondsToClock(level.time/60)
 
     table = Main_gui.container["Objectives"].table
@@ -145,7 +165,7 @@ local function player_join_game(player,at_player)
     area[1][1] = area[1][1] +  at_player * 500
     area[2][1] = area[2][1] +  at_player * 500
     islands[player.name] = area
-    local left_overs = surface.find_entities_filtered {area= area}
+    local left_overs = variables["surface"].find_entities_filtered {area= area}
     for i, ent in ipairs(left_overs) do
         if ent.name ~= "market" and ent.name ~= "steel-chest" then
             ent.destroy()
@@ -156,7 +176,7 @@ local function player_join_game(player,at_player)
         tiles[i] = tile
         tiles[i].position.x = tiles[i].position.x +  at_player * 500
     end
-    surface.set_tiles(tiles)
+    variables["surface"].set_tiles(tiles)
     for i, entity in ipairs(save["entity"]) do
         local name = entity[1]
         local position = {}
@@ -168,32 +188,38 @@ local function player_join_game(player,at_player)
         if name == "market" then
             markets[#markets + 1] = position
         end
+        --[[
         if name == "steel-chest" then
             chests[#chests+1] = {entity,player.name}
         end
-        local ent = surface.create_entity{name = name , position = position , force = force }
+        ]]
+        local ent = variables["surface"].create_entity{name = name , position = position , force = force }
+        if name == "steel-chest" then
+            chests[#chests+1] = {ent,player.name}
+        end
         ent.minable = minable
     end
     centers[player.name] = {}
     centers[player.name].x = level.center.x
     centers[player.name].y = level.center.y
     centers[player.name].x =  centers[player.name].x + at_player * 500
-    walls[player.name] = {}
-    local wal = surface.find_entities_filtered {name = "stone-wall", area= area}
+    variables.walls[player.name] = {}
+    local wal = variables["surface"].find_entities_filtered {name = "stone-wall", area= area}
     for i,wall in ipairs(wal) do
         local p = wall.position
-        walls[player.name][p.x..','..p.y] = true
+        variables.walls[player.name][p.x..','..p.y] = true
     end
     local center = centers[player.name]
     player.teleport({center.x,center.y},level.surface)
+    game.print("tp")
 end
 
 
 local function level_save()
-
+    local level = variables.level
     for x=level.area[1][1],level.area[2][1] do
         for y = level.area[1][2],level.area[2][2] do
-            local tile = surface.get_tile(x,y)
+            local tile = variables["surface"].get_tile(x,y)
             local table = {
                 name = tile.name,
                 position = tile.position
@@ -202,7 +228,7 @@ local function level_save()
         end
     end
 
-    save["entity"] = surface.find_entities_filtered {area = level.area}
+    save["entity"] = variables["surface"].find_entities_filtered {area = level.area}
     for i, entity in ipairs(save["entity"]) do
         local name = entity.name
         if name ~= "character" then
@@ -238,28 +264,31 @@ local function level_save()
         end
     end
 
-    walls = surface.find_entities_filtered {name = "stone-wall", area= level.area}
-    for i,wall in ipairs(walls) do
+    variables.walls = variables["surface"].find_entities_filtered {name = "stone-wall", area= level.area}
+    for i,wall in ipairs(variables.walls) do
         local p = wall.position
-        walls[p.x..','..p.y] = true
+        variables.walls[p.x..','..p.y] = true
     end
 end
 
 local function market_setup()
     for i, pos in ipairs(markets)  do
-        local market = surface.find_entity("market", pos)
+        local market = variables["surface"].find_entity("market", pos)
         market.clear_market_items()
-        for _, item in ipairs(level.items) do
+        for _, item in ipairs(variables.level.items) do
             local offer = {price = {{"coin", tightspot_prices[item]}}, offer = {type = "give-item", item = item}}
             market.add_market_item(offer)
         end
     end
 end
 local function start(args)
+    variables["level"] = {}
+    variables["surface"] = {}
+    variables["walls"] = {}
     local level_index = args[1]
-    level = config[level_index]
-    diffuclty = level.money[args[2]]
-    surface = game.surfaces[level["surface"]]
+    variables.level = config[level_index]
+    variables.diffuclty = variables.level.money[args[2]]
+    variables["surface"] = game.surfaces[variables.level["surface"]]
     if not save["tiles"][1] then
         level_save()
     end
@@ -269,12 +298,12 @@ local function start(args)
     local force = game.players[1].force
     force.disable_all_prototypes()
     local recipe_list = force.recipes
-    for index, item in pairs(level.recipes) do
+    for index, item in pairs(variables.level.recipes) do
         recipe_list[item].enabled = true
     end
 
     market_setup()
-    tick = game.tick
+    variables.tick = game.tick
 end
 
 
@@ -308,10 +337,10 @@ local function stop()
     end
     started[1] = false
 
-    local area = level.area
+    local area = variables.level.area
     area[1][1] = area[1][1]
     area[2][1] = area[2][1]
-    local left_overs = surface.find_entities_filtered {area= area}
+    local left_overs = variables["surface"].find_entities_filtered {area= area}
     for i, ent in ipairs(left_overs) do
         if ent.name ~= "market" and ent.name ~= "steel-chest" then
             ent.destroy()
@@ -324,7 +353,7 @@ local function stop()
         local minable = entity[4]
         position.x = position.x
         entity[2].x = position.x
-        local ent = surface.create_entity{name = name , position = position , force = force }
+        local ent = variables["surface"].create_entity{name = name , position = position , force = force }
         ent.minable = minable
     end
     local players = {}
@@ -357,7 +386,7 @@ local function stop()
     reset_table(entities)
     reset_table(started)
     reset_table(chests)
-    reset_table(walls)
+    reset_table(variables)
 end
 
 local function placed_entety(event)
@@ -368,7 +397,7 @@ local function placed_entety(event)
         entities[entity.name] = entity.name
         entity.active = false
     else
-        if not walls[player.name][position.x..','..position.y] then
+        if not variables.walls[player.name][position.x..','..position.y] then
             player.print("You cant resell this land.")
             player.insert{name = entity.name, count = 1}
             entity.destroy()
@@ -390,7 +419,7 @@ local function mined(event)
     if entity.type == "wall" then
         local position = entity.position
         local player = game.players[event.player_index]
-        if not walls[player.name][position.x..','..position.y] then
+        if not variables.walls[player.name][position.x..','..position.y] then
             local force = entity.force
             task.set_timeout_in_ticks(1, token_for_replace_wall,{{name = entity.name , position = position , force = force},player.name})
             player.print("How did you get here.")
@@ -407,7 +436,7 @@ local function mined(event)
     end
 end
 local function replace_wall(args)
-    surface.create_entity(args[1])
+    variables["surface"].create_entity(args[1])
     game.players[args[2]].remove_item{name = args[1].name,count = 1}
 end
 
@@ -418,7 +447,7 @@ local function start_game()
     for i,name in pairs(entities) do
         all_names[i] = name
     end
-    local all = surface.find_entities_filtered {name = all_names}
+    local all = variables["surface"].find_entities_filtered {name = all_names}
     for i,entity in ipairs(all) do
         entity.active = true
     end
@@ -432,7 +461,7 @@ local function start_game()
         local result = balance - Debt
         Store.set(balances,player,result)
         table["Debt"].caption = "0"
-        table["Time"].caption = SecondsToClock(level.play_time/60)
+        table["Time"].caption = SecondsToClock(variables.level.play_time/60)
 
         if Roles.player_allowed(player, 'gui/tightspot_speed') then
             table = Main_gui.container["slider"].table
@@ -452,8 +481,8 @@ local function check_chest()
         for i, chest in ipairs(chests) do
             local ent = chest[1]
             local inv = ent.get_inventory(defines.inventory.chest)
-            local count = inv.get_item_count(level.demand.item)
-            local price = count * level.demand.price
+            local count = inv.get_item_count(variables.level.demand.item)
+            local price = count * variables.level.demand.price
             if price ~= 0 then
                 local player = game.players[chest[2]]
                 local balance = Store.get(balances,player)
@@ -473,11 +502,11 @@ end
 
 local function timer()
     if started[1] ~= true then
-        local time = level.time
-        time = SecondsToClock((time - (game.tick - tick))/60)
+        local time = variables.level.time
+        time = SecondsToClock((time - (game.tick - variables.tick))/60)
         if time == "00:00" then
             started[1] = true
-            tick = game.tick
+            variables.tick = game.tick
             start_game()
         else
             for i,player in ipairs(game.connected_players) do
@@ -487,8 +516,8 @@ local function timer()
             end
         end
     else
-        local time = level.play_time
-        time = SecondsToClock((time - (game.tick - tick))/60)
+        local time = variables.level.play_time
+        time = SecondsToClock((time - (game.tick - variables.tick))/60)
         if time == "00:00" then
             Mini_games.stop_game()
         end
@@ -527,14 +556,54 @@ end
 
 local function player_move(event)
     local player = game.players[event.player_index]
-    local center = centers[player.name]
-    if center then
-        local pos = player.position
-        local area = islands[player.name]
-        if not insideBox(area,pos) then
-            player.teleport({center.x,center.y})
+    if player.surface.name == variables.level.surface then  --check if the player has not been tped away
+        local center = centers[player.name]
+        if center then
+            local pos = player.position
+            local area = islands[player.name]
+            if not insideBox(area,pos) then
+                player.teleport({center.x,center.y},variables.level.surface)
+            end
         end
     end
+end
+
+local function on_player_left_game(event)
+    local player = game.players[event.player_index]
+    player.set_controller {type = defines.controllers.god}
+    player.create_character()
+    player.teleport({-35,55},"nauvis")
+    --gui
+    local Main_gui = Gui.get_left_element(player, game_gui)
+    local table = Main_gui.container["slider"].table
+    table.visible = false
+    Gui.toggle_left_element(player,  Main_gui, false)
+end
+
+local function player_join(event)
+    local player = game.players[event.player_index]
+    local inv = player.get_inventory(defines.inventory.character_main)
+    local all_items = inv.get_contents()
+    player.character.destroy()
+    local center = centers[player.name]
+    if center then
+        player.teleport(center,variables.level.surface)
+        if started[1] then
+            player.set_controller {type = defines.controllers.spectator}
+        else
+            player.set_controller {type = defines.controllers.god}
+            local Main_gui = Gui.get_left_element(player, game_gui)
+            Gui.toggle_left_element(player,  Main_gui, true)
+            for item,amount in pairs(all_items) do
+                player.insert {name = item, count = amount}
+            end
+        end
+    else
+        player.set_controller {type = defines.controllers.spectator}
+        player.teleport(variables.level.center,variables.level.surface)
+    end
+
+
 end
 
 --gui
@@ -544,6 +613,7 @@ local  function speed_change(player, _, _)
     local table = Main_gui.container["slider"].table
     game.speed = table[speed_slider.name].slider_value
 end
+
 --game gui
 
 speed_slider =
@@ -667,6 +737,8 @@ tight:add_event(defines.events.on_built_entity, placed_entety)
 tight:add_event(defines.events.on_market_item_purchased, market)
 tight:add_event(defines.events.on_player_mined_entity, mined)
 tight:add_event(defines.events.on_player_changed_position, player_move)
+tight:add_event(defines.events.on_pre_player_left_game, on_player_left_game)
+tight:add_event(defines.events.on_player_joined_game, player_join)
 tight:add_on_nth_tick(100, check_chest)
 tight:add_on_nth_tick(60, timer)
 
