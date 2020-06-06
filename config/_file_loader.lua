@@ -10,6 +10,7 @@ return {
     'modules.commands.debug',
     'modules.commands.interface',
     'modules.commands.admin-chat',
+    'modules.commands.connect',
 
     --Gui
     'modules.gui.server-ups',

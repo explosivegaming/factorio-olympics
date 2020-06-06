@@ -65,6 +65,7 @@ Roles.new_role('Official','Official')
     'command/add',
     'command/dump',
     'command/set',
+    'command/connect'
 }
 
 --- Trusted Roles
