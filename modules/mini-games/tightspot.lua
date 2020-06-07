@@ -20,7 +20,7 @@ local entities = {}
 local started = {}
 local chests = {}
 local islands = {}
-
+local left_players = {}
 
 local tightspot_prices = {
     ["coal"] = 5,
@@ -76,6 +76,7 @@ Global.register({
     walls       = walls,
     variables   = variables,
     save        = save,
+    left_players= left_players,
 },function(tbl)
     centers     = tbl.centers
     markets     = tbl.markets
@@ -86,6 +87,7 @@ Global.register({
     walls       = tbl.walls
     variables   = tbl.variables
     save        = tbl.save
+    left_players= tbl.left_players
 end)
 
 
@@ -387,6 +389,7 @@ local function stop()
     reset_table(started)
     reset_table(chests)
     reset_table(variables)
+    reset_table(left_players)
 end
 
 local function placed_entety(event)
@@ -457,9 +460,7 @@ local function start_game()
         local Main_gui = Gui.get_left_element(player, game_gui)
         local table = Main_gui.container["Money"].table
         local Debt = tonumber(table["Debt"].caption)
-        local balance = Store.get(balances,player)
-        local result = balance - Debt
-        Store.set(balances,player,result)
+        Store.set(balances,player,Debt)
         table["Debt"].caption = "0"
         table["Time"].caption = SecondsToClock(variables.level.play_time/60)
 
@@ -570,6 +571,12 @@ end
 
 local function on_player_left_game(event)
     local player = game.players[event.player_index]
+
+    local inv = player.get_inventory(defines.inventory.god_main)
+    local all_items = inv.get_contents()
+    game.print(serpent.block(all_items))
+    left_players[player.name] = all_items
+
     player.set_controller {type = defines.controllers.god}
     player.create_character()
     player.teleport({-35,55},"nauvis")
@@ -582,11 +589,10 @@ end
 
 local function player_join(event)
     local player = game.players[event.player_index]
-    local inv = player.get_inventory(defines.inventory.character_main)
-    local all_items = inv.get_contents()
     player.character.destroy()
+    local items = left_players[player.name]
     local center = centers[player.name]
-    if center then
+    if items then
         player.teleport(center,variables.level.surface)
         if started[1] then
             player.set_controller {type = defines.controllers.spectator}
@@ -594,7 +600,7 @@ local function player_join(event)
             player.set_controller {type = defines.controllers.god}
             local Main_gui = Gui.get_left_element(player, game_gui)
             Gui.toggle_left_element(player,  Main_gui, true)
-            for item,amount in pairs(all_items) do
+            for item,amount in pairs(items) do
                 player.insert {name = item, count = amount}
             end
         end
