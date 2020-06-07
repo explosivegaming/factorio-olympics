@@ -460,7 +460,7 @@ local function start_game()
         local Main_gui = Gui.get_left_element(player, game_gui)
         local table = Main_gui.container["Money"].table
         local Debt = tonumber(table["Debt"].caption)
-        Store.set(balances,player,Debt)
+        Store.set(balances,player,Debt * -1)
         table["Debt"].caption = "0"
         table["Time"].caption = SecondsToClock(variables.level.play_time/60)
 
