@@ -290,6 +290,7 @@ local function start(args)
     local level_index = args[1]
     variables.level = config[level_index]
     variables.diffuclty = variables.level.money[args[2]]
+    variables.loan_price =  variables.level.loan_prices[args[2]]
     variables["surface"] = game.surfaces[variables.level["surface"]]
     if not save["tiles"][1] then
         level_save()
@@ -459,7 +460,8 @@ local function start_game()
 
         local Main_gui = Gui.get_left_element(player, game_gui)
         local table = Main_gui.container["Money"].table
-        local Debt = tonumber(table["Debt"].caption)
+        local Debt = tonumber(table["Debt"].caption)/5000 -- amount of loans taken
+        Debt = Debt * variables.loan_price --Each loan will cost variables.loan_prices points
         Store.set(balances,player,Debt * -1)
         table["Debt"].caption = "0"
         table["Time"].caption = SecondsToClock(variables.level.play_time/60)

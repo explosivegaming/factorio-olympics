@@ -209,7 +209,7 @@ function Mini_games.error_in_game(error_game)
 end
 local mini_game_list
 --gui
-local on_vote_click = function (player,element,_)
+local on_vote_click = function (_,element,_)
     local name = element.parent.name
     local scroll_table = element.parent.parent
     local mini_game = Mini_games.mini_games[name]

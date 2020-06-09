@@ -10,6 +10,11 @@ return {
             normal = 5000,
             hard = 3500,
         },
+        loan_prices = { -- how much a 5k loan will cost in points
+            easy = 100,
+            normal = 150,
+            hard = 200,
+        },
         center = {x = 0, y = 0}, --The center of the main island
         starting_land_prize = 10, --Minal cost of land.
         area = {{-25,-25},{26,26}}, --The area the main island is in.
