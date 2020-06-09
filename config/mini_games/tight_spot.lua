@@ -1,6 +1,6 @@
 return {
     {
-        surface = "tigth_spot", --Name of the surface.
+        surface = "tigth_spot_lv:1", --Name of the surface.
         level_number = 1, --Must be 1 higher then the last one.
         time =  5 * 60 * 60, -- The time in tick 1 sec is 60 ticks.
         play_time =  10 * 60 * 60, -- The time that the game plays when the player cant take action.
@@ -46,17 +46,22 @@ return {
         }
     },
     {
-        level_number = 2,
-        time = 10 * 60 * 60,
-        money = 10000,
-        required_balance = {
-            easy = 1000,
-            normal = 2000,
-            hard = 3000
+        surface = "tight_spot_lv:2", --Name of the surface.
+        time =  5 * 60 * 60, -- The time in tick 1 sec is 60 ticks.
+        play_time =  10 * 60 * 60, -- The time that the game plays when the player cant take action.
+        objective = "Green Circuit", -- Non data.raw objective.
+        money = { --The different tiers of money you get at the start.
+            easy = 10000,
+            normal = 5000,
+            hard = 3500,
         },
-        center = {x = 0, y = 0},
-        starting_land_prize = 10,
-        price_increase = 2,
+        loan_prices = { -- how much a 5k loan will cost in points
+            easy = 100,
+            normal = 150,
+            hard = 200,
+        },
+        center = {x = 0, y = 0}, --The center of the main island
+        starting_land_prize = 10, --Minal cost of land.
         area = {{-40, -40}, {40, 40}},
         recipes = {
             "iron-plate",
