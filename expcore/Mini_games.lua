@@ -96,7 +96,7 @@ function Mini_games._prototype:add_event(event_name,func)
     self.events[#self.events+1] = {handler,event_name}
 end
 
-function Mini_games.Running_game()
+function Mini_games.get_running_game()
     return started_game[1]
 end
 function Mini_games.start_game(name,parse_args)
