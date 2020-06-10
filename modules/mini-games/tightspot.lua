@@ -234,7 +234,7 @@ local function level_save()
             else
                 local ent = save.entities[#save.entities]
                 name = ent.name
-                local table = {name,entity.position, entity.force, entity.minable}
+                local table = {name,ent.position, ent.force, ent.minable}
                 save.entities[i] = table
                 save.entities[#save.entities] = nil
             end
