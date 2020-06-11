@@ -114,25 +114,23 @@ local function SecondsToClock(seconds)
 end
 
 local function change_balance(player,amount)
-    Store.update(balances,player,function()
-        if amount < 0 then
-            local available = player.get_item_count("coin")
-            amount = amount * -1
-            if available < amount then
-                local Debt =  5000 - amount
-                player.insert{name = "coin", count = Debt }
-                player.print("Borrowed 5000 coins to pay for the land")
-                local Main_gui = Gui.get_left_element(player, game_gui)
-                local table = Main_gui.container["Money"].table
-                table["Debt"].caption = tostring(tonumber(table["Debt"].caption) + 5000)
-            else
-                player.remove_item {name = "coin", count = amount}
-            end
-        elseif amount ~= 0 then
-            player.insert{name = "coin", count = amount}
+    if amount < 0 then
+        local available = player.get_item_count("coin")
+        amount = amount * -1
+        if available < amount then
+            local Debt =  5000 - amount
+            player.insert{name = "coin", count = Debt }
+            player.print("Borrowed 5000 coins to pay for the land")
+            local Main_gui = Gui.get_left_element(player, game_gui)
+            local table = Main_gui.container["Money"].table
+            table["Debt"].caption = tostring(tonumber(table["Debt"].caption) + 5000)
+        else
+            player.remove_item {name = "coin", count = amount}
         end
-        return player.get_item_count("coin")
-    end)
+    elseif amount ~= 0 then
+        player.insert{name = "coin", count = amount}
+    end
+    Store.set(balances,player,player.get_item_count("coin"))
 end
 
 local function player_join_game(player,at_player)
@@ -211,6 +209,7 @@ end
 
 local function level_save()
     local level = variables.level
+    local tiles = save["tiles"]
     for x=level.area[1][1],level.area[2][1] do
         for y = level.area[1][2],level.area[2][2] do
             local tile = variables["surface"].get_tile(x,y)
@@ -218,7 +217,7 @@ local function level_save()
                 name = tile.name,
                 position = tile.position
             }
-            save["tiles"][#save["tiles"]+1] = table
+            tiles[#tiles+1] = table
         end
     end
 
