@@ -229,15 +229,19 @@ local stop = function()
         ["2nd"] = "[color=#C0C0C0]",
         ["3rd"] = "[color=#cd7f32]"
     }
+    local airtable = {}
     for i, value in pairs(scores["finshed_times"]) do
         local time = value[2]
         local place = Nth(value[1])
         if colors[place] then
+            airtable[value[1] + (value[1]-1)] = i
+            airtable[value[1] * 2] = math.round(time,2)
             game.print(colors[place]..place..": "..i.." with "..time.." seconds.[/color]")
         else
             game.print("[color=#808080]"..place..": "..i.." with "..time.." seconds.[/color]")
         end
     end
+    Mini_games.update_airtable(airtable)
     resetall()
 end
 

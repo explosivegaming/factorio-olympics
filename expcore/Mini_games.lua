@@ -4,11 +4,17 @@ local Commands = require 'expcore.commands'
 local Gui = require 'expcore.gui._require'
 require 'config.expcore.command_runtime_disable' --required to load befor running the script
 local Roles = require 'expcore.roles' --- @dep expcore.roles
-
-
+local is_lobby = true
+local Async = require 'expcore.async' --- @dep expcore.async
+local server_adress = "127.0.0.1:12345"
 local Mini_games = {}
 local main_gui = {}
 local started_game = {}
+
+global.servers= {
+    Race_game = "127.0.0.1:7125",
+    lobby = "127.0.0.1:12345"
+}
 
 local Global = require 'utils.global' --Used to prevent desynicing.
 Global.register({
@@ -96,74 +102,117 @@ function Mini_games._prototype:add_event(event_name,func)
     self.events[#self.events+1] = {handler,event_name}
 end
 
+function Mini_games.get_running_game()
+    return started_game[1]
+end
 function Mini_games.start_game(name,parse_args)
-    local mini_game = Mini_games.mini_games[name]
-    if mini_game == nil then
-        return "This mini_game does not exsit"
-    end
-
-    if parse_args then
-        if  mini_game.options ~= #parse_args then
-            return "Wrong number of arguments"
+    if is_lobby then
+        local player_names = {}
+        local server = global.servers[name]
+        for _, player in ipairs(game.connected_players) do
+            player.connect_to_server{address=server,name=name}
+            player_names[#player_names+1 ] = player.name
         end
+        --data
+        local data = {}
+        data.type = "Started_game"
+        data.players = player_names
+        data.name = name
+        data.arguments = parse_args
+        data.server = server
+        game.write_file("mini_games/starting_game", game.table_to_json(data), false)
     else
-        if mini_game.options ~= 0 then
-            return "Wrong number of arguments"
+        local mini_game = Mini_games.mini_games[name]
+        if mini_game == nil then
+            return "This mini_game does not exsit"
         end
-    end
 
-    if started_game[1] == name then
-        return "This game is already running"
-    end
-
-    if mini_game.map == nil then
-        error("No map set")
-    end
-
-    if started_game[1] then
-        Mini_games.stop_game(started_game[1])
-    end
-
-    for _, player in ipairs(game.connected_players) do
-        player.teleport({mini_game.positon.x,mini_game.positon.y},mini_game.map)
-    end
-
-    started_game[1] = name
-
-    for i,value  in ipairs(mini_game.events) do
-        local handler = value[1]
-        local event_name = value[2]
-        Event.add_removable(event_name,handler)
-    end
-
-    for i,value  in ipairs(mini_game.onth_tick) do
-        local tick = value[1]
-        local token = value[2]
-        Event.add_removable_nth_tick(tick, token)
-    end
-
-    if mini_game.commands then
-        for i,command_name  in ipairs(mini_game.commands) do
-            Commands.enable(command_name)
-        end
-    end
-
-    local start_func = mini_game.start_function
-    if start_func then
         if parse_args then
-            local success, err = pcall(start_func,parse_args)
-            internal_error(success,err)
+            if  mini_game.options ~= #parse_args then
+                return "Wrong number of arguments"
+            end
         else
-            local success, err = pcall(start_func)
-            internal_error(success,err)
+            if mini_game.options ~= 0 then
+                return "Wrong number of arguments"
+            end
+        end
+
+        if started_game[1] == name then
+            return "This game is already running"
+        end
+
+        if mini_game.map == nil then
+            error("No map set")
+        end
+
+        if started_game[1] then
+            Mini_games.stop_game(started_game[1])
+        end
+
+        for _, player in ipairs(game.connected_players) do
+            player.teleport({mini_game.positon.x,mini_game.positon.y},mini_game.map)
+        end
+
+        started_game[1] = name
+
+        for i,value  in ipairs(mini_game.events) do
+            local handler = value[1]
+            local event_name = value[2]
+            Event.add_removable(event_name,handler)
+        end
+
+        for i,value  in ipairs(mini_game.onth_tick) do
+            local tick = value[1]
+            local token = value[2]
+            Event.add_removable_nth_tick(tick, token)
+        end
+
+        if mini_game.commands then
+            for i,command_name  in ipairs(mini_game.commands) do
+                Commands.enable(command_name)
+            end
+        end
+
+        local start_func = mini_game.start_function
+        if start_func then
+            if parse_args then
+                local success, err = pcall(start_func,parse_args)
+                internal_error(success,err)
+            else
+                local success, err = pcall(start_func)
+                internal_error(success,err)
+            end
         end
     end
 end
 
+function Mini_games.update_airtable(args)
+    local data = {}
+    data.type = "end_game"
+    data.Gold = args[1]
+    data.Gold_data = args[2]
+    data.Silver = args[3]
+    data.Silver_data = args[4]
+    data.Bronze = args[5]
+    data.Bronze_data = args[5]
+    data.server = server_adress
+    game.write_file("mini_games/end_game",game.table_to_json(data), false)
+end
 
-function Mini_games.stop_game()
+function Mini_games.stop_game(args)
     local mini_game = Mini_games.mini_games[started_game[1]]
-
+    if args then
+        local data = {}
+        data.type = "end_game"
+        data.Gold = args[1]
+        data.Gold_data = args[2]
+        data.Silver = args[3]
+        data.Silver_data = args[4]
+        data.Bronze = args[5]
+        data.Bronze_data = args[5]
+        data.server = server_adress
+        game.write_file("mini_games/end_game",game.table_to_json(data), false)
+    end
 
     started_game[1] = nil
     for i,value  in ipairs(mini_game.events) do
@@ -204,9 +253,27 @@ function Mini_games.error_in_game(error_game)
     Mini_games.stop_game()
     game.print("an error has occured things may be broken, error: "..error_game)
 end
+local kick_all =
+Async.register(function()
+    for i,player in ipairs(game.connected_players) do
+        game.kick_player(player,"You cant stay here")
+    end
+end)
+
+Commands.new_command('stop_games','Command to stop a mini_game.')
+:register(function(_,_)
+    for i,player in ipairs(game.connected_players) do
+        player.connect_to_server{address=global.servers["lobby"],name="lobby"}
+    end
+    Async.wait(300, kick_all)
+end)
+
+
+
 local mini_game_list
 --gui
-local on_vote_click = function (player,element,_)
+
+local on_vote_click = function (_,element,_)
     local name = element.parent.name
     local scroll_table = element.parent.parent
     local mini_game = Mini_games.mini_games[name]
@@ -221,7 +288,9 @@ local on_vote_click = function (player,element,_)
     end
 
     Mini_games.start_game(name,args)
-    Gui.update_top_flow(player)
+    for i,connected_player in ipairs(game.connected_players) do
+        Gui.update_top_flow(connected_player)
+    end
 end
 
 
