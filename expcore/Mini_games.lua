@@ -96,6 +96,9 @@ function Mini_games._prototype:add_event(event_name,func)
     self.events[#self.events+1] = {handler,event_name}
 end
 
+function Mini_games.get_running_game()
+    return started_game[1]
+end
 function Mini_games.start_game(name,parse_args)
     local mini_game = Mini_games.mini_games[name]
     if mini_game == nil then
@@ -206,7 +209,7 @@ function Mini_games.error_in_game(error_game)
 end
 local mini_game_list
 --gui
-local on_vote_click = function (player,element,_)
+local on_vote_click = function (_,element,_)
     local name = element.parent.name
     local scroll_table = element.parent.parent
     local mini_game = Mini_games.mini_games[name]
@@ -221,7 +224,9 @@ local on_vote_click = function (player,element,_)
     end
 
     Mini_games.start_game(name,args)
-    Gui.update_top_flow(player)
+    for i,connected_player in ipairs(game.connected_players) do
+        Gui.update_top_flow(connected_player)
+    end
 end
 
 

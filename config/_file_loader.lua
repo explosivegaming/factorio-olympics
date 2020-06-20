@@ -19,6 +19,7 @@ return {
     'modules.mini-games.greefer-start',
     'modules.mini-games.admin_overide',
     'modules.mini-games.Race',
+    'modules.mini-games.tightspot',
 
     -- Config Files
     'config.expcore.command_auth_admin', -- commands tagged with admin_only are blocked for non admins
