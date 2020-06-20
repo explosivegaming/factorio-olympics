@@ -333,8 +333,8 @@ local function stop()
     end
     local colors = {
         ["1st"] = "#FFD700",
-        ["2nd"] = "color=#C0C0C0",
-        ["3rd"] = "color=#cd7f32"
+        ["2nd"] = "#C0C0C0",
+        ["3rd"] = "#cd7f32"
     }
     table.sort(
         scores,
