@@ -89,26 +89,24 @@ Global.register({
 end)
 
 local function clean_up(area)
-    local left_overs = variables["surface"].find_entities_filtered {area= area}
-    for i, ent in ipairs(left_overs) do
-        if ent.name ~= "market" and ent.name ~= "steel-chest" then
-            ent.destroy()
-        end
-    end
+    local left_overs = variables["surface"].find_entities_filtered{ area=area, name={'market', 'steel-chest'}, invert=true}
+    for _, entity in ipairs(left_overs) do entity.destroy() end
 end
 
+local abs = math.abs
 local function land_price(player, position)
-    return math.abs(position.x - centers[player.name].x) + math.abs(position.y - centers[player.name].y) + variables.level.starting_land_prize
+    return abs(position.x - centers[player.name].x) + abs(position.y - centers[player.name].y) + variables.level.starting_land_prize
 end
 
+local str_format = string.format
 local function SecondsToClock(seconds)
     seconds = tonumber(seconds)
 
     if seconds <= 0 then
         return "00:00";
     else
-        local mins = string.format("%02.f", math.floor(seconds/60));
-        local secs = string.format("%02.f", math.floor(seconds  - mins *60));
+        local mins = str_format("%02.f", math.floor(seconds/60));
+        local secs = str_format("%02.f", math.floor(seconds  - mins *60));
         return mins..":"..secs
     end
 end
@@ -122,8 +120,8 @@ local function change_balance(player,amount)
             player.insert{name = "coin", count = Debt }
             player.print("Borrowed 5000 coins to pay for the land")
             local Main_gui = Gui.get_left_element(player, game_gui)
-            local table = Main_gui.container["Money"].table
-            table["Debt"].caption = tostring(tonumber(table["Debt"].caption) + 5000)
+            local gui_table = Main_gui.container["Money"].table
+            gui_table["Debt"].caption = tostring(tonumber(gui_table["Debt"].caption) + 5000)
         else
             player.remove_item {name = "coin", count = amount}
         end
@@ -141,8 +139,7 @@ local function player_join_game(player,at_player)
     if character and character.valid then
         character.destroy()
     end
-    local playerforce = player.force
-    playerforce.manual_mining_speed_modifier = 1000
+    player.force.manual_mining_speed_modifier = 1000
     Store.set(balances,player,variables.diffuclty)
     player.insert {name = "coin", count = variables.diffuclty}
 
@@ -175,9 +172,7 @@ local function player_join_game(player,at_player)
     variables["surface"].set_tiles(tiles)
     for i, entity in ipairs(save.entities) do
         local name = entity[1]
-        local position = {}
-        position.x = entity[2].x
-        position.y = entity[2].y
+        local position = { x=entity[2].x+player_offset, y=entity[2].y }
         local force = entity[3]
         local minable = entity[4]
         position.x = position.x + player_offset
@@ -202,8 +197,7 @@ local function player_join_game(player,at_player)
         local p = wall.position
         variables.walls[player.name][p.x..','..p.y] = true
     end
-    local center = centers[player.name]
-    player.teleport({center.x,center.y},level.surface)
+    player.teleport(centers[player.name], level.surface)
 end
 
 
@@ -213,11 +207,10 @@ local function level_save()
     for x=level.area[1][1],level.area[2][1] do
         for y = level.area[1][2],level.area[2][2] do
             local tile = variables["surface"].get_tile(x,y)
-            local table = {
+            tiles[#tiles+1] = {
                 name = tile.name,
                 position = tile.position
             }
-            tiles[#tiles+1] = table
         end
     end
 
@@ -232,8 +225,7 @@ local function level_save()
                 save.entities[i] = nil
             else
                 local ent = save.entities[#save.entities]
-                name = ent.name
-                local table = {name,ent.position, ent.force, ent.minable}
+                local table = {ent.name,ent.position, ent.force, ent.minable}
                 save.entities[i] = table
                 save.entities[#save.entities] = nil
             end
@@ -311,16 +303,12 @@ local function stop()
     started[1] = false
 
     local area = variables.level.area
-    area[1][1] = area[1][1]
-    area[2][1] = area[2][1]
     clean_up(area)
     for i, entity in ipairs(save.entities) do
         local name = entity[1]
         local position = entity[2]
         local force = entity[3]
         local minable = entity[4]
-        position.x = position.x
-        entity[2].x = position.x
         local ent = variables["surface"].create_entity{name = name , position = position , force = force }
         ent.minable = minable
     end
@@ -528,7 +516,7 @@ local function player_move(event)
             local pos = player.position
             local area = islands[player.name]
             if not insideBox(area,pos) then
-                player.teleport({center.x,center.y},variables.level.surface)
+                player.teleport(center, variables.level.surface)
             end
         end
     end
@@ -599,12 +587,10 @@ Gui.element(function(_,parent,name,caption1,caption2)
     parent.add {
         type = "label",
         caption = caption1,
-        style = "label",
     }
     parent.add{
         type = "label",
         caption = caption2,
-        style = "label",
         name = name
     }
 end)
