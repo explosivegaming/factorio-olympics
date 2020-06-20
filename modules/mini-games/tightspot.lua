@@ -187,7 +187,6 @@ local function player_join_game(player, at_player)
         local position = {x = entity[2].x + player_offset, y = entity[2].y}
         local force = entity[3]
         local minable = entity[4]
-        position.x = position.x + player_offset
         if name == "market" then
             markets[#markets + 1] = position
         end
@@ -229,15 +228,13 @@ local function level_save()
     for i, entity in ipairs(save.entities) do
         local name = entity.name
         if name ~= "character" then
-            local table = {name, entity.position, entity.force, entity.minable}
-            save.entities[i] = table
+            save.entities[i] = {name, entity.position, entity.force, entity.minable}
         else
             if i == #save.entities then
                 save.entities[i] = nil
             else
                 local ent = save.entities[#save.entities]
-                local table = {ent.name, ent.position, ent.force, ent.minable}
-                save.entities[i] = table
+                save.entities[i] = {ent.name, ent.position, ent.force, ent.minable}
                 save.entities[#save.entities] = nil
             end
         end
@@ -335,9 +332,9 @@ local function stop()
         scores[#scores + 1] = {Store.get(balances, name), name}
     end
     local colors = {
-        ["1st"] = "[color=#FFD700]",
-        ["2nd"] = "[color=#C0C0C0]",
-        ["3rd"] = "[color=#cd7f32]"
+        ["1st"] = "#FFD700",
+        ["2nd"] = "color=#C0C0C0",
+        ["3rd"] = "color=#cd7f32"
     }
     table.sort(
         scores,
@@ -350,9 +347,9 @@ local function stop()
         local player_name = score[2]
         local place = Nth(i)
         if colors[place] then
-            game.print(colors[place] .. place .. ": " .. player_name .. " with " .. money .. " points.[/color]")
+            game.print(str_format("[color=%s]%s: %s with %d points[/color]",colors[place],place,player_name,money))
         else
-            game.print("[color=#808080]" .. place .. ": " .. player_name .. " with " .. money .. " points.[/color]")
+            game.print(str_format("[color=#808080]%s: %s with %d points[/color]",place,player_name,money))
         end
     end
     reset_table(centers)
@@ -417,10 +414,12 @@ local function mined(event)
         end
     end
 end
+
 local function replace_wall(args)
     variables["surface"].create_entity(args[1])
     game.players[args[2]].remove_item {name = args[1].name, count = 1}
 end
+token_for_replace_wall = Token.register(replace_wall)
 
 local function start_game()
     game.print("Time is up.")
@@ -508,7 +507,6 @@ local function timer()
     end
 end
 
-token_for_replace_wall = Token.register(replace_wall)
 Store.watch(
     balances,
     function(value, key, _)
