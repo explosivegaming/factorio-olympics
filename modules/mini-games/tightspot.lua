@@ -178,8 +178,13 @@ local function player_join_game(player, at_player)
     clean_up(area)
     local tiles = {}
     for i, tile in ipairs(save["tiles"]) do
-        tiles[i] = tile
-        tiles[i].position.x = tiles[i].position.x + player_offset
+        tiles[i] = {
+            name = tile.name,
+            position = {
+              x = tile.position.x + player_offset,
+              y = tile.position.y
+            }
+        }
     end
     variables["surface"].set_tiles(tiles)
     for i, entity in ipairs(save.entities) do
