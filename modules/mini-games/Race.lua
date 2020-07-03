@@ -390,7 +390,7 @@ local kill_biters = Token.register(function(name)
     end
 end)
 
---- Repsawn the car for a player
+--- Respawn the car for a player
 local respawn_car = Token.register(function(name)
     local player = variables["Dead_car"][name].player
     local car = surface[1].create_entity {
