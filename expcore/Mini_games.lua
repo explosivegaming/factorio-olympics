@@ -4,15 +4,15 @@ local Commands = require 'expcore.commands'
 local Gui = require 'expcore.gui._require'
 require 'config.expcore.command_runtime_disable' --required to load befor running the script
 local Roles = require 'expcore.roles' --- @dep expcore.roles
-local is_lobby = true
 local Async = require 'expcore.async' --- @dep expcore.async
-local server_adress = "127.0.0.1:12345"
+
 local Mini_games = {}
 local main_gui = {}
 local started_game = {}
-
+Mini_games.is_lobby = true
+Mini_games.server_adress = true
 global.servers= {
-    Race_game = "127.0.0.1:7125",
+    Race_game = {"127.0.0.1:7125"},
     lobby = "127.0.0.1:12345"
 }
 
@@ -56,7 +56,6 @@ function Mini_games.new_game(name)
     Mini_games.mini_games[name] = mini_game
     return mini_game
 end
-
 
 function Mini_games._prototype:add_on_nth_tick(tick,func)
     local handler = Token.register(
@@ -106,9 +105,10 @@ function Mini_games.get_running_game()
     return started_game[1]
 end
 function Mini_games.start_game(name,parse_args)
-    if is_lobby then
+    if Mini_games.is_lobby then
         local player_names = {}
-        local server = global.servers[name]
+        local server_object = global.servers[name]
+        local server = server_object[#server_object]
         for _, player in ipairs(game.connected_players) do
             player.connect_to_server{address=server,name=name}
             player_names[#player_names+1 ] = player.name
@@ -195,7 +195,7 @@ function Mini_games.update_airtable(args)
     data.Silver_data = args[4]
     data.Bronze = args[5]
     data.Bronze_data = args[5]
-    data.server = server_adress
+    data.server = Mini_games.server_adress
     game.write_file("mini_games/end_game",game.table_to_json(data), false)
 end
 
@@ -210,7 +210,7 @@ function Mini_games.stop_game(args)
         data.Silver_data = args[4]
         data.Bronze = args[5]
         data.Bronze_data = args[5]
-        data.server = server_adress
+        data.server = Mini_games.server_adress
         game.write_file("mini_games/end_game",game.table_to_json(data), false)
     end
 
@@ -364,3 +364,4 @@ Gui.left_toolbar_button('entity/inserter', 'Nothing to see here', example_button
 
 
 return Mini_games
+
