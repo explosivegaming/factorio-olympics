@@ -59,6 +59,7 @@ Roles.new_role('Official','Official')
     'command/test',
     'command/hi',
     'gui/game_start',
+    'gui/tightspot_speed',
     'command/stop',
     'command/clear_votes',
     'command/start',
