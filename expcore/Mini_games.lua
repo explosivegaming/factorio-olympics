@@ -272,10 +272,7 @@ end)
 
 local mini_game_list
 --gui
-<<<<<<< HEAD
 
-=======
->>>>>>> dev
 local on_vote_click = function (_,element,_)
     local name = element.parent.name
     local scroll_table = element.parent.parent
