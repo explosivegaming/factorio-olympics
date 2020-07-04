@@ -260,8 +260,7 @@ local function start(args)
     variables["level"] = {}
     variables["surface"] = {}
     variables["walls"] = {}
-    local level_index = args[1]
-    game.print(serpent.block(args))
+    local level_index = tonumber(args[1])
     variables.level = config[level_index]
     variables.diffuclty = variables.level.money[args[2]]
     variables.loan_price = variables.level.loan_prices[args[2]]
