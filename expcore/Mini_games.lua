@@ -9,20 +9,24 @@ local Async = require 'expcore.async' --- @dep expcore.async
 local Mini_games = {}
 local main_gui = {}
 local started_game = {}
-Mini_games.is_lobby = true
-Mini_games.server_adress = true
+local vars = {}
+vars.is_lobby = false
+vars.server_adress = ""
+global.servers= {}
+--[[
 global.servers= {
-    Race_game = {"127.0.0.1:7125"},
-    lobby = "127.0.0.1:12345"
+    lobby =  "127.0.0.1:12345"
 }
-
+--]]
 local Global = require 'utils.global' --Used to prevent desynicing.
 Global.register({
     started_game = started_game,
     main_gui = main_gui,
+    vars = vars,
 },function(tbl)
     started_game = tbl.started_game
     main_gui = tbl.main_gui
+    vars = tbl.vars
 end)
 
 Mini_games["mini_games"] = {}
@@ -105,7 +109,10 @@ function Mini_games.get_running_game()
     return started_game[1]
 end
 function Mini_games.start_game(name,parse_args)
-    if Mini_games.is_lobby then
+    game.print(parse_args)
+    game.print(vars.is_lobby )
+    if vars.is_lobby == true  or vars.is_lobby =="true" then
+        game.print('hi')
         local player_names = {}
         local server_object = global.servers[name]
         local server = server_object[#server_object]
@@ -195,7 +202,7 @@ function Mini_games.update_airtable(args)
     data.Silver_data = args[4]
     data.Bronze = args[5]
     data.Bronze_data = args[5]
-    data.server = Mini_games.server_adress
+    data.server = vars.server_adress
     game.write_file("mini_games/end_game",game.table_to_json(data), false)
 end
 
@@ -210,7 +217,7 @@ function Mini_games.stop_game(args)
         data.Silver_data = args[4]
         data.Bronze = args[5]
         data.Bronze_data = args[5]
-        data.server = Mini_games.server_adress
+        data.server = vars.server_adress
         game.write_file("mini_games/end_game",game.table_to_json(data), false)
     end
 
@@ -254,10 +261,15 @@ function Mini_games.error_in_game(error_game)
     game.print("an error has occured things may be broken, error: "..error_game)
 end
 local kick_all =
-Async.register(function()
+function()
     for i,player in ipairs(game.connected_players) do
         game.kick_player(player,"You cant stay here")
     end
+end
+
+Commands.new_command('kill_all','Command to stop a mini_game.')
+:register(function(_,_)
+    kick_all()
 end)
 
 Commands.new_command('stop_games','Command to stop a mini_game.')
@@ -265,10 +277,17 @@ Commands.new_command('stop_games','Command to stop a mini_game.')
     for i,player in ipairs(game.connected_players) do
         player.connect_to_server{address=global.servers["lobby"],name="lobby"}
     end
-    Async.wait(300, kick_all)
 end)
-
-
+Commands.new_command('set_lobby','Command to stop a mini_game.')
+:add_param('data',"boolean")
+:register(function(_,_,data)
+    vars.is_lobby = data
+end)
+Commands.new_command('set_server_address','Command to stop a mini_game.')
+:add_param('data',false)
+:register(function(_,_,data)
+    vars.server_adress = data
+end)
 
 local mini_game_list
 --gui

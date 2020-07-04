@@ -261,6 +261,7 @@ local function start(args)
     variables["surface"] = {}
     variables["walls"] = {}
     local level_index = args[1]
+    game.print(serpent.block(args))
     variables.level = config[level_index]
     variables.diffuclty = variables.level.money[args[2]]
     variables.loan_price = variables.level.loan_prices[args[2]]
@@ -722,11 +723,10 @@ local function gui_callback(parent)
     local level_dropwdown = flow[dorpdown_for_level.name]
     local level_config = level_dropwdown.selected_index
     args[1] = level_config
-
     local difficulty_dropdown = flow[dorpdown_for_difficulty.name]
     local diffuclty_set = difficulty_dropdown.get_item(difficulty_dropdown.selected_index)
     args[2] = diffuclty_set
-
+    game.print(serpent.block(args))
     return args
 end
 tight:add_event(defines.events.on_built_entity, placed_entety)
