@@ -194,6 +194,7 @@ local function start(args)
 
         cars[name] = car
         scores[name] = {}
+        car.operable = false
         car.set_driver(player)
         player_progress[name] = 1
 
@@ -232,7 +233,7 @@ end
 local function Nth (n) return n..getSuffix(n) end
 
 --- Colours used while printing positions in chat
-local message_format = '%d: %s with %s seconds.'
+local message_format = '%s: %s with %s seconds.'
 local colors =  {
     ["1st"] = { 255, 215, 0   },
     ["2nd"] = { 192, 192, 192 },
@@ -358,7 +359,7 @@ local function player_move(event)
                 variables["place"] = variables["place"] + 1
 
                 -- If all players have finished then end the game
-                if scores["place"] > #game.connected_players - variables["new_joins"] then
+                if variables["place"] > #game.connected_players - variables["new_joins"] then
                     Mini_games.stop_game()
                 end
             end
@@ -393,13 +394,17 @@ end)
 --- Respawn the car for a player
 local respawn_car = Token.register(function(name)
     local player = variables["Dead_car"][name].player
+    local position = surface[1].find_non_colliding_position('car', variables["Dead_car"][name].position, 5, 0.5)
+    position = position or variables["Dead_car"][name].position
+
     local car = surface[1].create_entity {
         name = "car",
         direction = defines.direction.north,
-        position = variables["Dead_car"][name].position,
+        position = position,
         force = "player"
     }
 
+    car.operable = false
     car.set_driver(player)
     car.orientation = variables["Dead_car"][name].orientation
     car.get_fuel_inventory().insert{ name = variables["fuel"], count = 100 }
@@ -435,11 +440,12 @@ local car_destroyed = function(event)
     dead_car_data.group = Permission_Groups.get_group_from_player(player).name
 
     -- Make player invincible for a short time, then respawn the car
+    local offset = math.random(-30, 30)
     player.character.destructible = false
     Permission_Groups.set_player_group(player, "out_car")
-    task.set_timeout_in_ticks(180, respawn_car, name)
-    task.set_timeout_in_ticks(190, kill_biters, name)
-    task.set_timeout_in_ticks(480, stop_invincibility, name)
+    task.set_timeout_in_ticks(180+offset, respawn_car, name)
+    task.set_timeout_in_ticks(190+offset, kill_biters, name)
+    task.set_timeout_in_ticks(480+offset, stop_invincibility, name)
 
 end
 
