@@ -105,6 +105,9 @@ local default = Roles.new_role('Guest','')
     'command/search-help',
     'command/list-roles',
     'command/server-ups',
+    'command/warp',
+    'command/join-UFE',
+    'command/join-UFW',
 }
 
 --- Jail role

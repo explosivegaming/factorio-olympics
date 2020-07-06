@@ -399,6 +399,18 @@ function table.binary_search(t, target)
     return -1 - lower -- ~lower
 end
 
+--- Creates a shallow copy of a table. Does not copy Metatables.
+-- Shallow copies meaning it copies the reference to the object instead of the object itself.
+-- @tparam table the object to copy
+-- @treturn table the copied object
+function table.shallow_copy(tbl)
+    local copy = {}
+    for k, v in pairs(tbl) do
+        copy[k] = v
+    end
+    return copy
+end
+
 -- add table-related functions that exist in base factorio/util to the 'table' table
 require 'util'
 

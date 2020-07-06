@@ -246,10 +246,10 @@ Gui._prototype_element.on_open = event_handler_factory(defines.events.on_gui_ope
 
 --- Called when the player closes the GUI they have open.
 -- @tparam function handler the event handler which will be called
--- @usage element_define:on_close(function(event)
+-- @usage element_define:on_closed(function(event)
 --  event.player.print(table.inspect(event))
 --end)
-Gui._prototype_element.on_close = event_handler_factory(defines.events.on_gui_closed)
+Gui._prototype_element.on_closed = event_handler_factory(defines.events.on_gui_closed)
 
 --- Called when LuaGuiElement is clicked.
 -- @tparam function handler the event handler which will be called
