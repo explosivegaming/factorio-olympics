@@ -1,5 +1,5 @@
 local b = require 'utils.map_gen.builders'
-local RS = require 'utils.map_gen.redmew_surface'
+local MS = require 'utils.map_gen.minigame_surface'
 local Map_gen_presets = require 'utils.map_gen.map_gen_settings'
 local perlin = require 'utils.map_gen.perlin_noise'
 local floor = math.floor
@@ -16,7 +16,7 @@ local uranium_none = {
     }
 }
 
-RS.set_map_gen_settings({Map_gen_presets.oil_none, uranium_none, Map_gen_presets.ore_none, Map_gen_presets.water_none})
+MS.new('Space_Race'):set_map_gen_settings{Map_gen_presets.oil_none, uranium_none, Map_gen_presets.ore_none, Map_gen_presets.water_none}
 
 local sand_width = 128
 local sand_width_inv = math.tau / sand_width

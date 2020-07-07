@@ -1,4 +1,5 @@
 --[[
+    --- This is a modified version of redmew_surface to allow multiple surfaces to be defined, and for surfaces to be re-generated
     Creates a custom surface for all redmew maps so that we can ignore all user input at time of world creation.
 
     Allows map makers to define the map gen settings, map settings, and difficulty settings in as much or as little details as they want.
@@ -60,67 +61,49 @@
 ]]
 -- Dependencies
 require 'util'
-local Event = require 'utils.event'
 local Global = require 'utils.global'
-local config = {enabled=true}
 
 -- Localized functions
-local insert = table.insert
 local merge = util.merge
 local format = string.format
+local error_if_runtime = _C.error_if_runtime
 
 -- Constants
-local set_warn_message = 'set_%s has already been called. Calling this twice can lead to unexpected settings overwrites.'
-local vanilla_surface_name = 'nauvis'
-local redmew_surface_name = 'redmew'
+local set_warn_message = 'set_%s has already been called for %s. Calling this twice can lead to unexpected settings overwrites.'
 
 -- Local vars
-local set_difficulty_settings_called
-local set_map_gen_settings_called
-local set_map_settings_called
-local data = {
-    ['map_gen_settings_components'] = {},
-    ['map_settings_components'] = {},
-    ['difficulty_settings_components'] = {}
-}
-local Public = {}
+local Public = { _prototype = {}, surfaces = {} }
 
--- Global tokens
--- The nil definitions are to document what data might exist.
-local global_data = {
-    surface = nil,
-    first_player_position_check_override = nil,
-    spawn_position = nil,
-    island_tile = nil
+-- Global vars
+local primitives = {
+    newest_surface = nil
 }
 
-Global.register(
-    global_data,
-    function(tbl)
-        global_data = tbl
-    end
-)
+Global.register(primitives, function(tbl)
+    primitives = tbl
+end)
 
 -- Local functions
 
 --- Add the tables inside components into the given data_table
 local function combine_settings(components, data_table)
-    for _, v in pairs(components) do
-        insert(data_table, v)
+    local last = #data_table
+    for i, v in pairs(components) do
+        data_table[last+i] = v
     end
 end
 
 --- Sets up the difficulty settings
-local function set_difficulty_settings()
-    local combined_difficulty_settings = merge(data.difficulty_settings_components)
+local function set_difficulty_settings(settings)
+    local combined_difficulty_settings = merge(settings)
     for k, v in pairs(combined_difficulty_settings) do
         game.difficulty_settings[k] = v
     end
 end
 
 --- Sets up the map settings
-local function set_map_settings()
-    local combined_map_settings = merge(data.map_settings_components)
+local function set_map_settings(settings)
+    local combined_map_settings = merge(settings)
 
     -- Iterating through individual tables because game.map_settings is read-only
     if combined_map_settings.pollution then
@@ -165,142 +148,190 @@ local function set_map_settings()
     end
 end
 
+-- Public Functions
+
 --- Creates a new surface with the settings provided by the map file and the player.
-local function create_redmew_surface()
-    if not config.enabled then
-        -- we still need to set the surface so Public.get_surface() will work.
-        global_data.surface = game.surfaces[vanilla_surface_name]
-        return
-    end
+function Public._prototype:create_surface()
+    local surface = game.surfaces[self.surface_name]
 
-    local surface
-
-    if config.map_gen_settings then
+    if surface then
+        surface.clear()
+    elseif self.set_map_gen_settings_called then
         -- Add the user's map gen settings as the first entry in the table
         local combined_map_gen = {game.surfaces.nauvis.map_gen_settings}
         -- Take the map's settings and add them into the table
-        for _, v in pairs(data.map_gen_settings_components) do
-            insert(combined_map_gen, v)
+        for i, v in pairs(self.map_gen_settings_components) do
+            combined_map_gen[i+1] = v
         end
-        surface = game.create_surface(redmew_surface_name, merge(combined_map_gen))
+        surface = game.create_surface(self.surface_name, merge(combined_map_gen))
     else
-        surface = game.create_surface(redmew_surface_name)
+        surface = game.create_surface(self.surface_name)
     end
 
-    global_data.surface = surface
-
-    if config.difficulty then
-        set_difficulty_settings()
-    end
-    if config.map_settings then
-        set_map_settings()
+    if self.set_difficulty_settings_called then
+        set_difficulty_settings(self.difficulty_settings_components)
     end
 
+    if self.set_map_settings_called then
+        set_map_settings(self.map_settings_components)
+    end
+
+    primitives.newest_surface = surface
     surface.request_to_generate_chunks({0, 0}, 4)
     surface.force_generate_chunk_requests()
-    local spawn_position = global_data.spawn_position
-    if spawn_position then
-        game.forces.player.set_spawn_position(spawn_position, surface)
+    if self.spawn_position then
+        game.forces.player.set_spawn_position(self.spawn_position, surface)
     end
+
+    return surface
 end
 
---[[-- Teleport the player to the redmew surface and if there is no suitable location, create an island
-local function player_created(event)
-    local player = game.get_player(event.player_index)
-    local surface = global_data.surface
+--- Teleport the player to the redmew surface and if there is no suitable location, create an island
+function Public._prototype:teleport_player(player, position)
+    local surface = game.surfaces[self.surface_name]
 
-    local spawn_position = global_data.spawn_position or {x = 0, y = 0}
-    local pos = surface.find_non_colliding_position('character', spawn_position, 50, 1)
+    position = position or self.spawn_position or {x = 0, y = 0}
+    local pos = surface.find_non_colliding_position('character', position, 50, 1)
 
-    if pos and not global_data.first_player_position_check_override then -- we tp to that pos
+    if pos and not self.first_player_position_check_override then -- we tp to that pos
         player.teleport(pos, surface)
     else
         -- if there's no position available within range or we override the position check:
         -- create an island and place the player at spawn_position
-        local island_tile = global_data.island_tile or 'lab-white'
+        local island_tile = self.island_tile or 'lab-white'
         local tile_table = {}
+        local index = 1
         for x = -1, 1 do
             for y = -1, 1 do
-                insert(tile_table, {name = island_tile, position = {spawn_position.x - x, spawn_position.y - y}})
+                tile_table[index] = {name = island_tile, position = {position.x - x, position.y - y}}
+                index = index + 1
             end
         end
         surface.set_tiles(tile_table)
 
-        player.teleport(spawn_position, surface)
-        global_data.first_player_position_check_override = nil
+        player.teleport(position, surface)
+        self.first_player_position_check_override = nil
     end
-end]]
+end
 
--- Public functions
+--- Returns a new surface definition
+-- This can only be called during the control stage, and the same goes for all the set functions for a surface
+-- @param surface_name <string> the name of the surface that will be created with these settings
+function Public.new(surface_name)
+    error_if_runtime()
+
+    local surface = setmetatable({
+        surface_name = surface_name,
+
+        set_difficulty_settings_called = false,
+        set_map_gen_settings_called = false,
+        set_map_settings_called = false,
+
+        difficulty_settings_components = {},
+        map_gen_settings_components = {},
+        map_settings_components = {},
+
+    }, { __index = Public._prototype })
+
+    Public.surfaces[surface_name] = surface
+    return surface
+end
+
+--- Re-generate a surface, this takes the name of the surface that will be made, this will also set the active surface
+function Public.generate_surface(surface_name)
+    local surface = Public.surfaces[surface_name]
+    return surface:create_surface()
+end
+
+--- Teleport a player to a given surface, this takes the name of the surface to spawn the player on
+function Public.teleport_player(player, surface_name, position)
+    local surface = Public.surfaces[surface_name]
+    surface:teleport_player(player, position)
+end
+
+--- Set the currently active surface, this takes the name of the surface and sets it as the active one
+function Public.set_surface(surface_name)
+    primitives.newest_surface = game.surfaces[surface_name]
+end
+
+--- Get the currently active surface, this assumes the active one was the last one to be generated unless set other wise
+function Public.get_surface()
+    return primitives.newest_surface
+end
+
+--- Get the currently active surface name, this assumes the active one was the last one to be generated unless set other wise
+function Public.get_surface_name()
+    return primitives.newest_surface.name
+end
 
 --- Sets components to the difficulty_settings_components table
 -- It is an error to call this twice as later calls will overwrite earlier ones if values overlap.
 -- @param components <table> list of difficulty settings components (usually from resources.difficulty_settings)
-function Public.set_difficulty_settings(components)
-    if set_difficulty_settings_called then
-        log(format(set_warn_message, 'difficulty_settings'))
+function Public._prototype:set_difficulty_settings(components)
+    error_if_runtime()
+    if self.set_difficulty_settings_called then
+        log(format(set_warn_message, 'difficulty_settings', self.surface_name))
     end
-    combine_settings(components, data.difficulty_settings_components)
-    set_difficulty_settings_called = true
+    combine_settings(components, self.difficulty_settings_components)
+    self.set_difficulty_settings_called = true
 end
 
 --- Adds components to the map_gen_settings_components table
 -- It is an error to call this twice as later calls will overwrite earlier ones if values overlap.
 -- @param components <table> list of map gen components (usually from resources.map_gen_settings)
-function Public.set_map_gen_settings(components)
-    if set_map_gen_settings_called then
-        log(format(set_warn_message, 'map_gen_settings'))
+function Public._prototype:set_map_gen_settings(components)
+    error_if_runtime()
+    if self.set_map_gen_settings_called then
+        log(format(set_warn_message, 'map_gen_settings', self.surface_name))
     end
-    combine_settings(components, data.map_gen_settings_components)
-    set_map_gen_settings_called = true
+    combine_settings(components, self.map_gen_settings_components)
+    self.set_map_gen_settings_called = true
 end
 
 --- Adds components to the map_settings_components table
 -- It is an error to call this twice as later calls will overwrite earlier ones if values overlap.
 -- @param components <table> list of map setting components (usually from resources.map_settings)
-function Public.set_map_settings(components)
-    if set_map_settings_called then
-        log(format(set_warn_message, 'map_settings'))
+function Public._prototype:set_map_settings(components)
+    error_if_runtime()
+    if self.set_map_settings_called then
+        log(format(set_warn_message, 'map_settings', self.surface_name))
     end
-    combine_settings(components, data.map_settings_components)
-    set_map_settings_called = true
-end
-
---- Returns the LuaSurface that the map is created on.
--- Not safe to call outside of events.
-function Public.get_surface()
-    return global_data.surface
-end
-
---- Returns the string name of the surface that the map is created on.
--- This can safely be called at any time.
-function Public.get_surface_name()
-    if config.enabled then
-        return redmew_surface_name
-    else
-        return vanilla_surface_name
-    end
+    combine_settings(components, self.map_settings_components)
+    self.set_map_settings_called = true
 end
 
 --- Allows maps to skip the collision check for the first player being teleported.
 -- This is useful when a collision check at the spawn point is either invalid or puts the
 -- player in a position that will get them killed by map generation (ex. diggy, tetris)
-function Public.set_first_player_position_check_override(bool)
-    global_data.first_player_position_check_override = bool
+function Public._prototype:set_first_player_position_check_override(bool)
+    error_if_runtime()
+    self.first_player_position_check_override = bool
 end
 
 --- Allows maps to set a custom spawn position
 -- @param position <table> with x and y keys ex.{x = 5.0, y = 5.0}
-function Public.set_spawn_position(position)
-    global_data.spawn_position = position
+function Public._prototype:set_spawn_position(position)
+    error_if_runtime()
+    self.spawn_position = position
 end
 
 --- Allows maps to set the tile used for spawn islands
 -- @param tile_name <string> name of the tile to create the island out of
-function Public.set_spawn_island_tile(tile_name)
-    global_data.island_tile = tile_name
+function Public._prototype:set_spawn_island_tile(tile_name)
+    error_if_runtime()
+    self.island_tile = tile_name
 end
 
-Event.on_init(create_redmew_surface)
+--- Returns the LuaSurface that the map is created on.
+-- Not safe to call outside of events.
+function Public._prototype:get_surface()
+    return game.surfaces[self.surface_name]
+end
+
+--- Returns the string name of the surface that the map is created on.
+-- This can safely be called at any time.
+function Public._prototype:get_surface_name()
+    return self.surface_name
+end
 
 return Public

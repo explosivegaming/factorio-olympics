@@ -1,7 +1,7 @@
 local b = require 'utils.map_gen.builders'
 local Event = require 'utils.event' -- TODO
 local Global = require 'utils.global'
-local RS = require 'utils.map_gen.redmew_surface'
+local MS = require 'utils.map_gen.minigame_surface'
 
 local Game_mode_config = (require 'modules.mini-games.space_race.config').game_mode
 
@@ -104,7 +104,7 @@ if Game_mode_config.king_of_the_hill then
 
     Event.on_init(
         function()
-            local surface = RS.get_surface()
+            local surface = MS.get_surface()
             for k, entity in pairs(outpost_1) do
                 entity.position[2] = entity.position[2] + island_1_offset
                 entity.force = 'neutral'

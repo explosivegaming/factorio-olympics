@@ -3,7 +3,7 @@ local Global = require 'utils.global'
 local Token = require 'utils.token'
 local Task = require 'utils.task'
 local Color = require 'utils.color_presets'
-local RS = require 'utils.map_gen.redmew_surface'
+local MS = require 'utils.map_gen.minigame_surface'
 
 local Mini_games = require "expcore.Mini_games"
 
@@ -16,7 +16,6 @@ local config = require 'modules.mini-games.space_race.config'
 
 local floor = math.floor
 
-require 'utils.map_gen.map_loader'
 local cliff = require 'modules.mini-games.space_race.cliff_generator'
 local load_gui = require 'modules.mini-games.space_race.gui.load_gui'
 local join_gui = require 'modules.mini-games.space_race.gui.join_gui'
@@ -55,8 +54,8 @@ local primitives = {
     won = nil
 }
 
-local lobby_group =
-Permission_Groups.new_group('lobby')
+local map_loading_group =
+Permission_Groups.new_group('map_loading')
 :disallow{
     'start_walking'
 }
@@ -87,8 +86,7 @@ local function start(args)
     local force_USA = game.create_force('United Factory Workers')
     local force_USSR = game.create_force('Union of Factory Employees')
 
-    local surface = RS.get_surface()
-
+    local surface = MS.generate_surface('Space_Race')
     surface.min_brightness = 0;
 
     force_USSR.set_spawn_position({x = 409, y = 0}, surface)
@@ -100,10 +98,10 @@ local function start(args)
     force_USSR.research_queue_enabled = true
     force_USA.research_queue_enabled = true
 
-    force_USSR.chart(RS.get_surface(), {{x = 380, y = 64}, {x = 420, y = -64}})
-    force_USA.chart(RS.get_surface(), {{x = -380, y = 64}, {x = -420, y = -64}})
+    force_USSR.chart(surface, {{x = 380, y = 64}, {x = 420, y = -64}})
+    force_USA.chart(surface, {{x = -380, y = 64}, {x = -420, y = -64}})
 
-    --game.forces.player.chart(RS.get_surface(), {{x = 400, y = 65}, {x = -400, y = -33}})
+    --game.forces.player.chart(MS.get_surface(), {{x = 400, y = 65}, {x = -400, y = -33}})
 
     local market
     market = surface.create_entity {name = 'market', position = {x = 404, y = 0}, force = force_USSR}
@@ -190,10 +188,6 @@ local function start(args)
     primitives.force_USA = force_USA
     primitives.force_USSR = force_USSR
 
-    for _, player in ipairs(game.connected_players) do
-        lobby_group:add_player(player)
-    end
-
     Public.remove_recipes()
     Public.update_gui()
 end
@@ -206,11 +200,13 @@ local function restore_character(player)
         end
         player.set_controller {type = defines.controllers.god}
         player.create_character()
-        lobby_group:remove_player(player)
+        map_loading_group:remove_player(player)
         game.permissions.get_group('Default').add_player(player)
         for _, item in pairs(starting_items) do
             player.insert(item)
         end
+    else
+        map_loading_group:add_player(player)
     end
 end
 
@@ -233,7 +229,7 @@ for i = -out_of_map_height / 2, out_of_map_height / 2, 1 do
 end
 
 local function generate_structures()
-    local surface = RS.get_surface()
+    local surface = MS.get_surface()
 
     local force_USSR = primitives.force_USSR
     local force_USA = primitives.force_USA
@@ -280,16 +276,25 @@ local function start_game()
     for _, player in pairs(primitives.force_USSR.players) do
         restore_character(player)
     end
-    local surface = RS.get_surface()
+    local surface = MS.get_surface()
     cliff.generate_cliffs(surface)
     surface.set_tiles(tiles)
     generate_structures()
 end
 
+local check_map_gen_is_done
 local function stop_game()
+    game.merge_forces(primitives.force_USA, game.forces.player)
+    game.merge_forces(primitives.force_USSR, game.forces.player)
+    Event.remove_removable_nth_tick(60, check_map_gen_is_done)
     for i, player in ipairs(game.connected_players) do
-        player.set_controller {type = defines.controllers.god}
+        if player.character then player.character.destroy() end
+        player.set_controller{type = defines.controllers.god}
         player.create_character()
+        map_loading_group:remove_player(player)
+        local center = player.gui.center
+        Gui.destroy_if_valid(center['Space-Race-Lobby'])
+        Gui.destroy_if_valid(center['Space-Race-Wait'])
     end
 end
 
@@ -351,7 +356,7 @@ local function get_teleport_location(force, to_safe_zone)
     else
         position = {0, 0}
     end
-    local non_colliding_pos = RS.get_surface().find_non_colliding_position('character', position, 6, 1)
+    local non_colliding_pos = MS.get_surface().find_non_colliding_position('character', position, 6, 1)
     position = non_colliding_pos and non_colliding_pos or position
     return position
 end
@@ -410,8 +415,6 @@ end
 Commands.new_command('warp', 'Use to switch between PVP and Safe-zone in Space Race')
 :register(teleport)
 
-local check_map_gen_is_done
-
 local start_game_delayed =
     Token.register(
     function()
@@ -431,7 +434,7 @@ check_map_gen_is_done =
         local num_ussr_players = #primitives.force_USSR.connected_players
         local num_players = num_usa_players + num_ussr_players
         if not primitives.game_started and num_players >= players_needed then
-            local surface = RS.get_surface()
+            local surface = MS.get_surface()
             if
                 primitives.started_tick ~= -1 and surface.get_tile({388.5, 0}).name == 'landfill' and surface.get_tile({-388.5, 0}).name == 'landfill' and surface.get_tile({388.5, 60}).name == 'out-of-map' and surface.get_tile({-388.5, 60}).name == 'out-of-map' and
                     surface.get_tile({-479.5, 0}).name == 'water' and
@@ -521,7 +524,7 @@ function Public.join_usa(player)
         player.force = force_USA
         player.print('[color=green]You have joined United Factory Workers![/color]')
         restore_character(player)
-        player.teleport(get_teleport_location(force_USA, true), RS.get_surface())
+        player.teleport(get_teleport_location(force_USA, true), MS.get_surface())
         check_ready_to_start()
         Public.update_gui()
     end
@@ -564,7 +567,7 @@ function Public.join_ussr(player)
         player.force = force_USSR
         player.print('[color=green]You have joined Union of Factory Employees![/color]')
         restore_character(player)
-        player.teleport(get_teleport_location(force_USSR, true), RS.get_surface())
+        player.teleport(get_teleport_location(force_USSR, true), MS.get_surface())
         check_ready_to_start()
         Public.update_gui()
     end
@@ -596,7 +599,7 @@ function Public.show_gui(event)
         wait_gui.show_gui(event)
         return
     end
-    local won = remote.call('space-race', 'get_won')
+    local won = primitives.won
     if won then
         won_gui.show_gui(event, won)
     else
@@ -680,7 +683,7 @@ local space_race = Mini_games.new_game("Space_Race")
 space_race:set_start_function(start)
 space_race:set_stop_function(stop_game)
 space_race:add_option(2)
-space_race:add_map(RS.get_surface_name(), 0, 10)
+space_race:add_map('nauvis', -35, 55)
 
 space_race:add_event(defines.events.on_player_joined_game, on_player_joined)
 space_race:add_event(defines.events.on_player_left_game, on_player_left)
