@@ -152,11 +152,9 @@ end
 
 --- Creates a new surface with the settings provided by the map file and the player.
 function Public._prototype:create_surface()
-    local surface = game.surfaces[self.surface_name]
+    local surface
 
-    if surface then
-        surface.clear()
-    elseif self.set_map_gen_settings_called then
+    if self.set_map_gen_settings_called then
         -- Add the user's map gen settings as the first entry in the table
         local combined_map_gen = {game.surfaces.nauvis.map_gen_settings}
         -- Take the map's settings and add them into the table
@@ -237,10 +235,15 @@ function Public.new(surface_name)
     return surface
 end
 
---- Re-generate a surface, this takes the name of the surface that will be made, this will also set the active surface
+--- Generate a surface, this takes the name of the surface that will be made, this will also set the active surface
 function Public.generate_surface(surface_name)
     local surface = Public.surfaces[surface_name]
     return surface:create_surface()
+end
+
+--- Remove a surface so that it can be regenerated later, this can not be done during the same tick as generate_surface
+function Public.remove_surface(surface_name)
+    game.delete_surface(surface_name)
 end
 
 --- Teleport a player to a given surface, this takes the name of the surface to spawn the player on

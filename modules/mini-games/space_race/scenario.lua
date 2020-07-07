@@ -1,3 +1,4 @@
+--- Util Requires
 local Event = require 'utils.event'
 local Global = require 'utils.global'
 local Token = require 'utils.token'
@@ -5,17 +6,18 @@ local Task = require 'utils.task'
 local Color = require 'utils.color_presets'
 local MS = require 'utils.map_gen.minigame_surface'
 
+--- Expcore Requires
 local Mini_games = require "expcore.Mini_games"
-
 local Gui = require 'expcore.Gui'
 local Commands = require 'expcore.commands'
 local Permission_Groups = require "expcore.permission_groups"
+
+--- Feature Requires
 local Retailer = require 'modules.mini-games.space_race.retailer'
 local Market_Items = require 'modules.mini-games.space_race.market_items'
 local config = require 'modules.mini-games.space_race.config'
 
-local floor = math.floor
-
+--- Gui and map gen requires
 local cliff = require 'modules.mini-games.space_race.cliff_generator'
 local load_gui = require 'modules.mini-games.space_race.gui.load_gui'
 local join_gui = require 'modules.mini-games.space_race.gui.join_gui'
@@ -23,6 +25,9 @@ local wait_gui = require 'modules.mini-games.space_race.gui.wait_gui'
 local won_gui  = require 'modules.mini-games.space_race.gui.won_gui'
 local market_events = require 'modules.mini-games.space_race.market_handler'
 
+--- Local Variables
+local player_kill_reward = config.player_kill_reward
+local floor = math.floor
 local Public = {}
 
 local starting_items = {
@@ -30,22 +35,19 @@ local starting_items = {
     {name = 'iron-plate', count = 16}
 }
 
-local players_needed = config.players_needed_to_start_game -- Replaced in start
-local player_kill_reward = config.player_kill_reward
-local startup_timer = config.bootstrap_period -- Replaced in start
-
 local player_ports = {
     USA = {{x = -409, y = 0}, {x = -380, y = 0}},
     USSR = {{x = 409, y = 0}, {x = 380, y = 0}}
 }
 
-local disabled_research = config.disabled_research
-
 local researched_tech = {}
-
+local disabled_research = config.disabled_research
 local disabled_recipes = config.disabled_recipes
 
+--- Global Variables
 local primitives = {
+    players_needed = 1,
+    startup_timer = 30*3600,
     game_started = false,
     game_generating = false,
     started_tick = nil,
@@ -54,21 +56,20 @@ local primitives = {
     won = nil
 }
 
+Global.register(primitives, function(tbl)
+    primitives = tbl
+end)
+
+--- Permission group used during map generation
 local map_loading_group =
 Permission_Groups.new_group('map_loading')
 :disallow{
     'start_walking'
 }
 
-Global.register(
-    {
-        primitives = primitives
-    },
-    function(tbl)
-        primitives = tbl.primitives
-    end
-)
+----- Game Init and Start -----
 
+--- Remove disabled recipes from forces
 function Public.remove_recipes()
     local USA_recipe = primitives.force_USA.recipes
     local USSR_recipe = primitives.force_USSR.recipes
@@ -78,9 +79,10 @@ function Public.remove_recipes()
     end
 end
 
-local function start(args)
-    players_needed = args[1]
-    startup_timer = args[2]
+--- Main init function for the mini game
+local function init(args)
+    primitives.players_needed = args[1]
+    primitives.startup_timer = args[2] * 3600
     game.difficulty_settings.technology_price_multiplier = 0.5
 
     local force_USA = game.create_force('United Factory Workers')
@@ -192,6 +194,7 @@ local function start(args)
     Public.update_gui()
 end
 
+--- Respawn a character making sure it has the correct items and permission group
 local function restore_character(player)
     if primitives.game_started then
         local character = player.character
@@ -210,6 +213,7 @@ local function restore_character(player)
     end
 end
 
+--- Tile map used to produce the two out of map walls
 local tiles = {}
 
 local out_of_map_x = 388
@@ -228,6 +232,7 @@ for i = -out_of_map_height / 2, out_of_map_height / 2, 1 do
     end
 end
 
+--- Creates the walls, silo, and turret at a teams spawn
 local function generate_structures()
     local surface = MS.get_surface()
 
@@ -266,6 +271,7 @@ local function generate_structures()
     gun_turret.insert({name = 'firearm-magazine', count = 200})
 end
 
+--- Used to start the game after the map has been generated and teams assigned
 local function start_game()
     primitives.game_started = true
     primitives.started_tick = game.tick
@@ -282,11 +288,152 @@ local function start_game()
     generate_structures()
 end
 
+----- Pre Game Start -----
+
+--- Used to start the game after a 10 second count down
 local check_map_gen_is_done
+local start_game_delayed = Token.register(function()
+    if primitives.started_tick == -1 then
+        primitives.started_tick = 0
+        load_gui.remove_gui()
+        Event.remove_removable_nth_tick(60, check_map_gen_is_done)
+        start_game()
+    end
+end)
+
+--- Check that a tile is valid and is the correct type
+local function check_tile_type(surface, x, y, name)
+    local tile = surface.get_tile{x, y}
+    return tile.valid and tile.name == name
+end
+
+--- Check if the map generation is done, ran once per second until generation is done
+check_map_gen_is_done = Token.register(function()
+    local num_usa_players = #primitives.force_USA.connected_players
+    local num_ussr_players = #primitives.force_USSR.connected_players
+    local num_players = num_usa_players + num_ussr_players
+    if not primitives.game_started and num_players >= primitives.players_needed then
+        local surface = MS.get_surface()
+        if
+            primitives.started_tick ~= -1
+            and check_tile_type(surface,  388.5, 0,  'landfill')   and check_tile_type(surface, -388, 0,  'landfill')
+            and check_tile_type(surface,  388,   60, 'out-of-map') and check_tile_type(surface, -388, 60, 'out-of-map')
+            and check_tile_type(surface, -479,   0,  'water')      and check_tile_type(surface,  479, 0,  'water')
+        then
+            primitives.started_tick = -1
+            game.print('[color=yellow]Game starts in 10 seconds![/color]')
+            Task.set_timeout_in_ticks(599, start_game_delayed, {})
+        end
+        load_gui.show_gui_to_all()
+    else
+        primitives.started_tick = nil
+        load_gui.remove_gui()
+        Event.remove_removable_nth_tick(60, check_map_gen_is_done)
+    end
+end)
+
+--- Check if the game is ready to start, this will start the map gen checking
+local function check_ready_to_start()
+    if primitives.game_started then
+        return
+    end
+    local num_usa_players = #primitives.force_USA.connected_players
+    local num_ussr_players = #primitives.force_USSR.connected_players
+    local num_players = num_usa_players + num_ussr_players
+    if not primitives.game_started and num_players >= primitives.players_needed then
+        if primitives.started_tick == nil then
+            primitives.started_tick = game.tick
+            Event.add_removable_nth_tick(60, check_map_gen_is_done)
+        end
+    else
+        local message = primitives.force_USA.name .. ' has ' .. num_usa_players .. ' players\n ' .. primitives.force_USSR.name .. ' has ' .. num_ussr_players .. ' players\n\n' .. primitives.players_needed - num_players .. ' more players needed to start!'
+        load_gui.show_gui_to_all(message)
+    end
+end
+
+--- Make a player join team usa
+local get_teleport_location
+function Public.join_usa(player)
+    local force_USA = primitives.force_USA
+
+    local force = player.force
+    if force == force_USA then
+        player.print('[color=red]Failed to join [/color][color=yellow]United Factory Workers,[/color][color=red] you are already part of this team![/color]')
+        return false
+    end
+
+    if player.character then
+        local empty_inventory =
+        player.get_inventory(defines.inventory.character_main).is_empty() and
+        player.get_inventory(defines.inventory.character_trash).is_empty() and
+        player.get_inventory(defines.inventory.character_ammo).is_empty() and
+        player.get_inventory(defines.inventory.character_armor).is_empty() and
+        player.get_inventory(defines.inventory.character_guns).is_empty() and
+        player.crafting_queue_size == 0
+        if not empty_inventory then
+            player.print('[color=red]Failed to join [/color][color=yellow]United Factory Workers,[/color][color=red] you need an empty inventory![/color]')
+            return false
+        end
+    end
+
+    player.force = force_USA
+    player.print('[color=green]You have joined United Factory Workers![/color]')
+    restore_character(player)
+    player.teleport(get_teleport_location(force_USA, true), MS.get_surface())
+    check_ready_to_start()
+    Public.update_gui()
+    return true
+end
+
+--- Make a player join team ussr
+function Public.join_ussr(player)
+    local force_USSR = primitives.force_USSR
+
+    local force = player.force
+    if force == force_USSR then
+        player.print('[color=red]Failed to join [/color][color=yellow]United Factory Workers,[/color][color=red] you are already part of this team![/color]')
+        return false
+    end
+
+    if player.character then
+        local empty_inventory =
+        player.get_inventory(defines.inventory.character_main).is_empty() and
+        player.get_inventory(defines.inventory.character_trash).is_empty() and
+        player.get_inventory(defines.inventory.character_ammo).is_empty() and
+        player.get_inventory(defines.inventory.character_armor).is_empty() and
+        player.get_inventory(defines.inventory.character_guns).is_empty() and
+        player.crafting_queue_size == 0
+        if not empty_inventory then
+            player.print('[color=red]Failed to join [/color][color=yellow]United Factory Workers,[/color][color=red] you need an empty inventory![/color]')
+            return false
+        end
+    end
+
+    player.force = force_USSR
+    player.print('[color=green]You have joined Union of Factory Employees![/color]')
+    restore_character(player)
+    player.teleport(get_teleport_location(force_USSR, true), MS.get_surface())
+    check_ready_to_start()
+    Public.update_gui()
+    return true
+end
+
+----- Game Stop -----
+
+--- Used to stop a game and reset all variables, called by mini game manager
 local function stop_game()
     game.merge_forces(primitives.force_USA, game.forces.player)
     game.merge_forces(primitives.force_USSR, game.forces.player)
     Event.remove_removable_nth_tick(60, check_map_gen_is_done)
+    MS.remove_surface('Space_Race')
+
+    primitives.force_USA = nil
+    primitives.force_USSR = nil
+    primitives.game_started = false
+    primitives.game_generating = false
+    primitives.started_tick = nil
+    primitives.won = nil
+
     for i, player in ipairs(game.connected_players) do
         if player.character then player.character.destroy() end
         player.set_controller{type = defines.controllers.god}
@@ -298,12 +445,14 @@ local function stop_game()
     end
 end
 
+--- Used to print a force won, and stop the game
 local function victory(force)
     primitives.won = force
     game.print('Congratulations to ' .. force.name .. '. You have gained factory dominance!')
     Mini_games.stop_game()
 end
 
+--- Used to print a force lost, and stop the game
 function Public.lost(force)
     local force_USA = primitives.force_USA
     if force == force_USA then
@@ -313,10 +462,106 @@ function Public.lost(force)
     end
 end
 
+----- Warp Command -----
+
+--- Check if a player is allowed to teleport
+local function allow_teleport(force, position)
+    if force == primitives.force_USA and position.x > 0 then
+        return false
+    elseif force == primitives.force_USSR and position.x < 0 then
+        return false
+    end
+    return math.abs(position.x) > 377 and math.abs(position.x) < 410 and position.y > -10 and position.y < 10
+end
+
+--- Get the teleport location for a force, either in the pvp zone or in the sage zone
+function get_teleport_location(force, to_safe_zone)
+    local port_number = to_safe_zone and 1 or 2
+    local position
+    if force == primitives.force_USA then
+        position = player_ports.USA[port_number]
+    elseif force == primitives.force_USSR then
+        position = player_ports.USSR[port_number]
+    else
+        position = {0, 0}
+    end
+    local non_colliding_pos = MS.get_surface().find_non_colliding_position('character', position, 6, 1)
+    position = non_colliding_pos and non_colliding_pos or position
+    return position
+end
+
+--- Command used to teleport from pvp to safe and vise versa
+Commands.new_command('warp', 'Use to switch between PVP and Safe-zone in Space Race')
+:register(function(player)
+    local character = player.character
+    if not character or not character.valid then
+        player.print('[color=yellow]Could not warp, you are not part of a team yet![/color]')
+        return Commands.error
+    end
+
+    local tick = game.tick - primitives.started_tick
+    if tick < primitives.startup_timer then
+        local time_left = primitives.startup_timer - tick
+        if time_left > 60 then
+            local minutes = (time_left / 3600)
+            minutes = minutes - minutes % 1
+            time_left = time_left - (minutes * 3600)
+            local seconds = (time_left / 60)
+            seconds = seconds - seconds % 1
+            time_left = minutes .. ' minutes and ' .. seconds .. ' seconds left'
+        else
+            local seconds = (time_left - (time_left % 60)) / 60
+            time_left = seconds .. ' seconds left'
+        end
+        player.print('[color=yellow]Could not warp, in setup phase![/color] [color=red]' .. time_left .. '[/color]')
+        return Commands.error
+    end
+
+    local position = character.position
+    local force = player.force
+    if allow_teleport(force, position) then
+        if math.abs(position.x) < 388.5 then
+            player.teleport(get_teleport_location(force, true))
+        else
+            player.teleport(get_teleport_location(force, false))
+        end
+    else
+        player.print('[color=yellow]Could not warp, you are too far from rocket silo![/color]')
+        return Commands.error
+    end
+
+end)
+
+----- Public Variables -----
+
+--- Get the force that has won
+function Public.get_won()
+    return primitives.won
+end
+
+--- Get an array of the teams
+function Public.get_teams()
+    return {primitives.force_USA, primitives.force_USSR}
+end
+
+--- Get the game status
+function Public.get_game_status()
+    return primitives.game_started
+end
+
+--- Get the tick the game started
+function Public.get_started_tick()
+    return primitives.started_tick
+end
+
+----- Events -----
+
+--- Triggered when a rocket is launch, causes that team to win
 local function on_rocket_launched(event)
     victory(event.rocket_silo.force)
 end
 
+--- Triggered when a entity is built, certain entities will be moved to neutral force, while others are printed to chat
 local function on_built_entity(event)
     local entity = event.created_entity
 
@@ -337,30 +582,7 @@ local function on_built_entity(event)
     end
 end
 
-local function allow_teleport(force, position)
-    if force == primitives.force_USA and position.x > 0 then
-        return false
-    elseif force == primitives.force_USSR and position.x < 0 then
-        return false
-    end
-    return math.abs(position.x) > 377 and math.abs(position.x) < 410 and position.y > -10 and position.y < 10
-end
-
-local function get_teleport_location(force, to_safe_zone)
-    local port_number = to_safe_zone and 1 or 2
-    local position
-    if force == primitives.force_USA then
-        position = player_ports.USA[port_number]
-    elseif force == primitives.force_USSR then
-        position = player_ports.USSR[port_number]
-    else
-        position = {0, 0}
-    end
-    local non_colliding_pos = MS.get_surface().find_non_colliding_position('character', position, 6, 1)
-    position = non_colliding_pos and non_colliding_pos or position
-    return position
-end
-
+--- Called once per second, will update a players movement speed based on their health
 local function check_damaged_players()
     for k, player in pairs (game.connected_players) do
         if player.character and player.character.health ~= nil then
@@ -375,226 +597,27 @@ local function check_damaged_players()
 	end
 end
 
-local function teleport(player)
-    local character = player.character
-    if not character or not character.valid then
-        player.print('[color=yellow]Could not warp, you are not part of a team yet![/color]')
-        return Commands.error
+--- Triggered when a player joins the game
+local function on_player_joined(event)
+    local player = game.players[event.player_index]
+    if player.force ~= game.forces.player then
+        player.teleport(get_teleport_location(player.force, true))
     end
-    local tick = game.tick - primitives.started_tick
-    if tick < startup_timer then
-        local time_left = startup_timer - tick
-        if time_left > 60 then
-            local minutes = (time_left / 3600)
-            minutes = minutes - minutes % 1
-            time_left = time_left - (minutes * 3600)
-            local seconds = (time_left / 60)
-            seconds = seconds - seconds % 1
-            time_left = minutes .. ' minutes and ' .. seconds .. ' seconds left'
-        else
-            local seconds = (time_left - (time_left % 60)) / 60
-            time_left = seconds .. ' seconds left'
-        end
-        player.print('[color=yellow]Could not warp, in setup phase![/color] [color=red]' .. time_left .. '[/color]')
-        return Commands.error
-    end
-    local position = character.position
-    local force = player.force
-    if allow_teleport(force, position) then
-        if math.abs(position.x) < 388.5 then
-            player.teleport(get_teleport_location(force, true))
-        else
-            player.teleport(get_teleport_location(force, false))
-        end
-    else
-        player.print('[color=yellow]Could not warp, you are too far from rocket silo![/color]')
-        return Commands.error
-    end
+    Public.update_gui()
 end
 
-Commands.new_command('warp', 'Use to switch between PVP and Safe-zone in Space Race')
-:register(teleport)
-
-local start_game_delayed =
-    Token.register(
-    function()
-        if primitives.started_tick == -1 then
-            primitives.started_tick = 0
-            load_gui.remove_gui()
-            Event.remove_removable_nth_tick(60, check_map_gen_is_done)
-            start_game()
-        end
-    end
-)
-
-check_map_gen_is_done =
-    Token.register(
-    function()
-        local num_usa_players = #primitives.force_USA.connected_players
-        local num_ussr_players = #primitives.force_USSR.connected_players
-        local num_players = num_usa_players + num_ussr_players
-        if not primitives.game_started and num_players >= players_needed then
-            local surface = MS.get_surface()
-            if
-                primitives.started_tick ~= -1 and surface.get_tile({388.5, 0}).name == 'landfill' and surface.get_tile({-388.5, 0}).name == 'landfill' and surface.get_tile({388.5, 60}).name == 'out-of-map' and surface.get_tile({-388.5, 60}).name == 'out-of-map' and
-                    surface.get_tile({-479.5, 0}).name == 'water' and
-                    surface.get_tile({479.5, 0}).name == 'water'
-             then
-                primitives.started_tick = -1
-                game.print('[color=yellow]Game starts in 10 seconds![/color]')
-                Task.set_timeout_in_ticks(599, start_game_delayed, {})
-            end
-            load_gui.show_gui_to_all()
-        else
-            primitives.started_tick = nil
-            load_gui.remove_gui()
-            Event.remove_removable_nth_tick(60, check_map_gen_is_done)
-        end
-    end
-)
-
-local function check_ready_to_start()
-    if primitives.game_started then
-        return
-    end
-    local num_usa_players = #primitives.force_USA.connected_players
-    local num_ussr_players = #primitives.force_USSR.connected_players
-    local num_players = num_usa_players + num_ussr_players
-    if not primitives.game_started and num_players >= players_needed then
-        if primitives.started_tick == nil then
-            primitives.started_tick = game.tick
-            Event.add_removable_nth_tick(60, check_map_gen_is_done)
-        end
-    else
-        local message = primitives.force_USA.name .. ' has ' .. num_usa_players .. ' players\n ' .. primitives.force_USSR.name .. ' has ' .. num_ussr_players .. ' players\n\n' .. players_needed - num_players .. ' more players needed to start!'
-        load_gui.show_gui_to_all(message)
-    end
+--- Triggered when a player leaves the game
+local function on_player_left(event)
+    local player = game.players[event.player_index]
+    player.teleport({-35, 55}, "nauvis")
+    Public.update_gui()
 end
 
-local function check_player_balance(force)
-    local force_USSR = primitives.force_USSR
-    local force_USA = primitives.force_USA
+----- Gui and Registering -----
 
-    --local usa_players = #force_USA.players
-    --local ussr_players = #force_USSR.players
-
-    local usa_connected = #force_USA.connected_players
-    local ussr_connected = #force_USSR.connected_players
-
-    if force == force_USSR then
-        --return ussr_players - 2 <= usa_players and ussr_connected <= usa_connected
-        return usa_connected - ussr_connected
-    elseif force == force_USA then
-        -- return ussr_players >= usa_players - 2 and ussr_connected >= usa_connected
-        return ussr_connected - usa_connected
-    end
-end
-
-function Public.join_usa(player)
-    local force_USA = primitives.force_USA
-    local force_USSR = primitives.force_USSR
-
-    local force = player.force
-    local balance = check_player_balance(force_USA)
-    local allow_switching_team = balance >= 2
-    if balance < 0 then
-        player.print('[color=red]Failed to join [/color][color=yellow]United Factory Workers,[/color][color=red] teams would become unbalanced![/color]')
-        return Commands.error
-    end
-    if not primitives.game_started or (force ~= force_USSR and force ~= force_USA) or allow_switching_team then
-        if force == force_USA then
-            player.print('[color=red]Failed to join [/color][color=yellow]United Factory Workers,[/color][color=red] you are already part of this team![/color]')
-            return Commands.error
-        end
-
-        if allow_switching_team and player.character then
-            local empty_inventory =
-            player.get_inventory(defines.inventory.character_main).is_empty() and
-            player.get_inventory(defines.inventory.character_trash).is_empty() and
-            player.get_inventory(defines.inventory.character_ammo).is_empty() and
-            player.get_inventory(defines.inventory.character_armor).is_empty() and
-            player.get_inventory(defines.inventory.character_guns).is_empty() and
-            player.crafting_queue_size == 0
-            if not empty_inventory then
-                player.print('[color=red]Failed to join [/color][color=yellow]United Factory Workers,[/color][color=red] you need an empty inventory![/color]')
-                return Commands.error
-            end
-        end
-
-        player.force = force_USA
-        player.print('[color=green]You have joined United Factory Workers![/color]')
-        restore_character(player)
-        player.teleport(get_teleport_location(force_USA, true), MS.get_surface())
-        check_ready_to_start()
-        Public.update_gui()
-    end
-    player.print('Failed to join new team, do not be a spy!')
-end
-
-Commands.new_command('join-UFW', 'Use to join United Factory Workers in Space Race')
-:register(Public.join_usa)
-
-function Public.join_ussr(player)
-    local force_USA = primitives.force_USA
-    local force_USSR = primitives.force_USSR
-
-    local force = player.force
-    local balance = check_player_balance(force_USSR)
-    local allow_switching_team = balance >= 2
-    if balance < 0 then
-        player.print('[color=red]Failed to join [/color][color=yellow]Union of Factory Employees[/color][color=red], teams would become unbalanced![/color]')
-        return Commands.error
-    end
-    if not primitives.game_started or (force ~= force_USSR and force ~= force_USA) or allow_switching_team then
-        if force == force_USSR then
-            player.print('[color=red]Failed to join [/color][color=yellow]United Factory Workers,[/color][color=red] you are already part of this team![/color]')
-            return Commands.error
-        end
-
-        if allow_switching_team and player.character then
-            local empty_inventory =
-            player.get_inventory(defines.inventory.character_main).is_empty() and
-            player.get_inventory(defines.inventory.character_trash).is_empty() and
-            player.get_inventory(defines.inventory.character_ammo).is_empty() and
-            player.get_inventory(defines.inventory.character_armor).is_empty() and
-            player.get_inventory(defines.inventory.character_guns).is_empty() and
-            player.crafting_queue_size == 0
-            if not empty_inventory then
-                player.print('[color=red]Failed to join [/color][color=yellow]United Factory Workers,[/color][color=red] you need an empty inventory![/color]')
-                return Commands.error
-            end
-        end
-        player.force = force_USSR
-        player.print('[color=green]You have joined Union of Factory Employees![/color]')
-        restore_character(player)
-        player.teleport(get_teleport_location(force_USSR, true), MS.get_surface())
-        check_ready_to_start()
-        Public.update_gui()
-    end
-    player.print('Failed to join new team, do not be a spy!')
-end
-
-Commands.new_command('join-UFE', 'Use to join Union of Factory Employees in Space Race')
-:register(Public.join_ussr)
-
-function Public.get_won()
-    return primitives.won
-end
-
-function Public.get_teams()
-    return {primitives.force_USA, primitives.force_USSR}
-end
-
-function Public.get_game_status()
-    return primitives.game_started
-end
-
-function Public.get_started_tick()
-    return primitives.started_tick
-end
-
+--- Show the correct gui to the player
 function Public.show_gui(event)
-    if #game.connected_players < players_needed and (not remote.call('space-race', 'get_game_status')) then
+    if #game.connected_players < primitives.players_needed and (not remote.call('space-race', 'get_game_status')) then
         game.forces.enemy.evolution_factor = 0
         wait_gui.show_gui(event)
         return
@@ -607,6 +630,7 @@ function Public.show_gui(event)
     end
 end
 
+--- Update the gui for all players
 function Public.update_gui()
     local players = game.connected_players
     for i = 1, #players do
@@ -621,26 +645,14 @@ function Public.update_gui()
     end
 end
 
-local function on_player_joined(event)
-    local player = game.players[event.player_index]
-    if player.force ~= game.forces.player then
-        player.teleport(get_teleport_location(player.force, true))
-    end
-    Public.update_gui()
-end
-
-local function on_player_left(event)
-    local player = game.players[event.player_index]
-    player.teleport({-35, 55}, "nauvis")
-    Public.update_gui()
-end
-
+--- Added a remote interface
 remote.add_interface('space-race', Public)
 
 --- Text entry for the number of players who will play
 local text_field_for_players =
 Gui.element{
     type = 'textfield',
+    tooltip = 'Player Count',
     text  = "1",
     numeric = true,
 }
@@ -652,11 +664,12 @@ Gui.element{
 local text_field_for_startup =
 Gui.element{
     type = 'textfield',
-    text  = tostring(60 * 60 * 30),
+    tooltip = 'Peace Time Duration (minutes)',
+    text = tostring(30),
     numeric = true,
 }
 :style{
-  width = 100
+  width = 50
 }
 
 --- Main gui for starting the game
@@ -680,7 +693,7 @@ end
 
 --- Register the game to the mini game module
 local space_race = Mini_games.new_game("Space_Race")
-space_race:set_start_function(start)
+space_race:set_start_function(init)
 space_race:set_stop_function(stop_game)
 space_race:add_option(2)
 space_race:add_map('nauvis', -35, 55)
@@ -699,5 +712,3 @@ space_race:set_gui_element(main_gui)
 space_race:set_gui_callback(gui_callback)
 
 space_race:add_command('warp')
-space_race:add_command('join-UFE')
-space_race:add_command('join-UFW')
