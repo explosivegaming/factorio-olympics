@@ -63,13 +63,6 @@ Global.register(primitives, function(tbl)
     primitives = tbl
 end)
 
---- Permission group used during map generation
-local map_loading_group =
-Permission_Groups.new_group('map_loading')
-:disallow{
-    'start_walking'
-}
-
 ----- Game Init and Start -----
 
 --- Remove disabled recipes from forces
@@ -209,13 +202,10 @@ local function restore_character(player)
         end
         player.set_controller {type = defines.controllers.god}
         player.create_character()
-        map_loading_group:remove_player(player)
         game.permissions.get_group('Default').add_player(player)
         for _, item in pairs(starting_items) do
             player.insert(item)
         end
-    else
-        map_loading_group:add_player(player)
     end
 end
 
@@ -450,7 +440,6 @@ local function stop_game()
         if player.character then player.character.destroy() end
         player.set_controller{type = defines.controllers.god}
         player.create_character()
-        map_loading_group:remove_player(player)
         local center = player.gui.center
         Gui.destroy_if_valid(center['Space-Race-Lobby'])
         Gui.destroy_if_valid(center['Space-Race-Wait'])
