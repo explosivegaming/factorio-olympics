@@ -737,7 +737,7 @@ tight:add_event(defines.events.on_player_joined_game, player_join)
 tight:add_on_nth_tick(100, check_chest)
 tight:add_on_nth_tick(60, timer)
 
-tight:add_map("nauvis", 0, 0)
+tight:add_map("tight_spot_lv:1", 0, 0)
 tight:set_start_function(start)
 tight:set_gui_callback(gui_callback)
 tight:set_gui_element(maingui)

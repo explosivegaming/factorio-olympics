@@ -201,7 +201,7 @@ function Mini_games.update_airtable(args)
     data.Silver = args[3]
     data.Silver_data = args[4]
     data.Bronze = args[5]
-    data.Bronze_data = args[5]
+    data.Bronze_data = args[6]
     data.server = vars.server_adress
     game.write_file("mini_games/end_game",game.table_to_json(data), false)
 end
