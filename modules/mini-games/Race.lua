@@ -11,6 +11,7 @@ local gates = {}
 local areas = {}
 local player_progress = {}
 local cars = {}
+local dead_cars = {}
 local variables = {}
 local scores = {}
 local laps = {}
@@ -36,6 +37,7 @@ Global.register({
     areas           = areas,
     player_progress = player_progress,
     cars            = cars,
+    dead_cars       = dead_cars,
     scores          = scores,
     laps            = laps,
     gate_boxes      = gate_boxes,
@@ -47,6 +49,7 @@ Global.register({
     areas           = tbl.areas
     player_progress = tbl.player_progress
     cars            = tbl.cars
+    dead_cars       = tbl.dead_cars
     scores          = tbl.scores
     laps            = tbl.laps
     gate_boxes      = tbl.gate_boxes
@@ -69,6 +72,7 @@ local function reset_globals()
     reset_table(variables)
     reset_table(player_progress)
     reset_table(cars)
+    reset_table(dead_cars)
     reset_table(scores)
     reset_table(laps)
     reset_table(start_players)
@@ -151,7 +155,8 @@ local function start(args)
     end
 
     -- Error if an invalid fuel was given
-    if not game.item_prototypes[variables["fuel"]] then
+    local prototype = game.item_prototypes[variables["fuel"]]
+    if not prototype or not prototype.fuel_category then
         return Mini_games.error_in_game("No fuel with that name")
     end
 
@@ -312,8 +317,8 @@ local function player_move(event)
                 car.teleport{276,-406}
                 car.orientation = 0.25
             else
-                variables["Dead_car"][name].position = {276,-406}
-                variables["Dead_car"][name].orientation = 0.25
+                dead_cars[name].position = {276,-406}
+                dead_cars[name].orientation = 0.25
             end
             player_progress[name] = 1
             player.print("[font=default-bold]YOU CAN'T TAKE A SHORTCUT, CHEATER![/font]")
@@ -370,7 +375,7 @@ end
 --- Make the car indestructible and cause all biters to flee
 local function start_invincibility(car,name)
     car.destructible = false
-    local biters = surface[1].find_enemy_units(variables["Dead_car"][name].position, 50, "player")
+    local biters = surface[1].find_enemy_units(dead_cars[name].position, 50, "player")
     for i, biter in ipairs(biters) do
         biter.set_command{ type = defines.command.flee, distraction = defines.distraction.by_anything, from = car }
     end
@@ -378,24 +383,28 @@ end
 
 --- Make the car and player destructible again
 local stop_invincibility = Token.register(function(name)
-    variables["Dead_car"][name].car.destructible = true
-    local player = variables["Dead_car"][name].player
+    dead_cars[name].car.destructible = true
+    local player = dead_cars[name].player
     player.character.destructible = true
 end)
 
 --- Kill all biters in a close range to the player
 local kill_biters = Token.register(function(name)
-    local biters = surface[1].find_enemy_units(variables["Dead_car"][name].position, 3, "player")
+    local biters = surface[1].find_enemy_units(dead_cars[name].position, 3, "player")
     for i, biter in ipairs(biters) do
         biter.destroy()
     end
 end)
 
 --- Respawn the car for a player
-local respawn_car = Token.register(function(name)
-    local player = variables["Dead_car"][name].player
-    local position = surface[1].find_non_colliding_position('car', variables["Dead_car"][name].position, 5, 0.5)
-    position = position or variables["Dead_car"][name].position
+local respawn_car
+respawn_car = Token.register(function(name)
+    local player = dead_cars[name].player
+    local position = surface[1].find_non_colliding_position('car', dead_cars[name].position, 5, 0.5)
+    if not position then
+        local offset = math.random(-10, 10)
+        return task.set_timeout_in_ticks(30+offset, respawn_car, name)
+    end
 
     local car = surface[1].create_entity {
         name = "car",
@@ -406,31 +415,28 @@ local respawn_car = Token.register(function(name)
 
     car.operable = false
     car.set_driver(player)
-    car.orientation = variables["Dead_car"][name].orientation
+    car.orientation = dead_cars[name].orientation
     car.get_fuel_inventory().insert{ name = variables["fuel"], count = 100 }
     cars[name] = car
 
-    Permission_Groups.set_player_group(player, variables["Dead_car"][name].group)
+    Permission_Groups.set_player_group(player, dead_cars[name].group)
     start_invincibility(car, name)
 
-    variables["Dead_car"][name].car = car
+    dead_cars[name].car = car
 end)
 
 --- Triggered when an entity is destroyed, used to respawn the car
 local car_destroyed = function(event)
     local dead_car = event.entity
     if dead_car.name ~= "car" then return end
-    if not variables["Dead_car"] then
-        variables["Dead_car"] = {}
-    end
 
     -- Get the data for the car
     local player = dead_car.get_driver().player
     local name = player.name
-    local dead_car_data = variables["Dead_car"][name]
+    local dead_car_data = dead_cars[name]
     if not dead_car_data then
         dead_car_data = {}
-        variables["Dead_car"][name] = dead_car_data
+        dead_cars[name] = dead_car_data
     end
 
     -- Update the data for the car

@@ -298,7 +298,7 @@ local function start(args)
     variables["walls"] = {}
 
     -- Setup all level related variables
-    local level_index = args[1]
+    local level_index = tonumber(args[1])
     variables.level = config[level_index]
     variables.difficulty = variables.level.money[args[2]]
     variables.loan_price = variables.level.loan_prices[args[2]]
@@ -454,7 +454,7 @@ local function mined(event)
         )
         player.print("How did you get here. (Ps if not command uses tell and admin of this.)")
     else
-        -- Otherwise give the player money
+        -- Otherwise will charge the player for the new land
         local price = land_price(player, position)
         change_balance(player, price * -1)
         player.surface.create_entity {
@@ -656,7 +656,13 @@ Gui.element {
 }
 :on_value_changed(function(_, element, _)
     if Mini_games.get_running_game() == "Tight_spot" then
-        game.speed = element.slider_value
+        local name, value = element.name, element.slider_value
+        if value == game.speed then return end
+        game.speed = value
+        for _, player in ipairs(game.connected_players) do
+            local Main_gui = Gui.get_left_element(player, game_gui)
+            Main_gui.container.slider.table[name].slider_value = value
+        end
     end
 end)
 
