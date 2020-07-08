@@ -402,8 +402,7 @@ respawn_car = Token.register(function(name)
     local player = dead_cars[name].player
     local position = surface[1].find_non_colliding_position('car', dead_cars[name].position, 5, 0.5)
     if not position then
-        local offset = math.random(-10, 10)
-        return task.set_timeout_in_ticks(30+offset, respawn_car, name)
+        return task.set_timeout_in_ticks(30, respawn_car, name)
     end
 
     local car = surface[1].create_entity {
