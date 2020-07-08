@@ -158,7 +158,9 @@ end
 local function map_gen_action(data)
     local state = data.y
 
-    if state < 32 then
+    if not data.surface.valid then
+        return false
+    elseif state < 32 then
         local shape = surfaces[data.surface.name]
         if shape == nil then
             return false

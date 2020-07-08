@@ -1,7 +1,5 @@
 local Config = {
     version = 'v0.4.7',
-    players_needed_to_start_game = 4,
-    bootstrap_period = 60 * 60 * 30, -- 30 minutes
     player_kill_reward = 25,
     entity_kill_rewards = {
         ['default'] = 1,
@@ -47,12 +45,6 @@ local Config = {
         ['big-biter'] = {low = 3, high = 8, chance = 0.05},
         ['behemoth-biter'] = {low = 8, high = 10, chance = 0.05}
     },
-    turret_active_delays = {
-        ['ammo-turret'] = 60 * 3,
-        ['electric-turret'] = 60 * 10,
-        ['fluid-turret'] = 60 * 5,
-        ['artillery-turret'] = 60 * 60
-    },
     warning_on_built = {
         ['artillery-turret'] = true,
         ['artillery-wagon'] = true,
@@ -60,11 +52,6 @@ local Config = {
     },
     neutral_entities = {
         ['wooden-chest'] = true
-    },
-    snake = {
-        size = 45,
-        max_food = 8,
-        speed = 30
     },
     map_gen = { -- Does not yet support being changed!
         width_1 = 256,

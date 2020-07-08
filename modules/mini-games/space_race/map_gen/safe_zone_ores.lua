@@ -3,7 +3,7 @@ local Random = require 'utils.map_gen.random'
 local Global = require 'utils.global'
 local MS = require 'utils.map_gen.minigame_surface'
 
-local Map_gen_config = (require 'modules.mini-games.space_race.config').map_gen
+local Map_gen_config = (require 'config.mini_games.space_race').map_gen
 
 local seed = nil -- set to number to force seed
 local seed_2 = nil -- set to number to force seed
@@ -76,16 +76,15 @@ end
 
 local mirrored_ore = b.grid_pattern_full_overlap(ore_pattern, p_cols, p_rows, 48, 48)
 
-Global.register_init(
-    {},
-    function(tbl)
-        tbl.seed = seed or MS.get_surface().map_gen_settings.seed
-        tbl.seed_2 = seed_2 or tbl.seed * 2
-    end,
-    function(tbl)
-        seed = tbl.seed
-        seed_2 = tbl.seed_2
-    end
-)
+local primitives = {}
+local function on_init()
+    primitives.seed = seed or MS.get_surface().map_gen_settings.seed
+    primitives.seed_2 = seed_2 or primitives.seed * 2
+end
 
-return mirrored_ore
+Global.register(primitives, function(tbl)
+    seed = tbl.seed
+    seed_2 = tbl.seed_2
+end)
+
+return { shape = mirrored_ore, on_init = on_init }

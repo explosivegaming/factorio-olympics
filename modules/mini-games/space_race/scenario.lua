@@ -15,7 +15,7 @@ local Permission_Groups = require "expcore.permission_groups"
 --- Feature Requires
 local Retailer = require 'modules.mini-games.space_race.retailer'
 local Market_Items = require 'modules.mini-games.space_race.market_items'
-local config = require 'modules.mini-games.space_race.config'
+local config = require 'config.mini_games.space_race'
 
 --- Gui and map gen requires
 local cliff = require 'modules.mini-games.space_race.cliff_generator'
@@ -24,6 +24,9 @@ local join_gui = require 'modules.mini-games.space_race.gui.join_gui'
 local wait_gui = require 'modules.mini-games.space_race.gui.wait_gui'
 local won_gui  = require 'modules.mini-games.space_race.gui.won_gui'
 local market_events = require 'modules.mini-games.space_race.market_handler'
+local uranium_gen_events = require('modules.mini-games.space_race.map_gen.uranium_island').events
+local safe_ore_gen_on_init = require('modules.mini-games.space_race.map_gen.safe_zone_ores').on_init
+local wild_ore_gen_on_init = require('modules.mini-games.space_race.map_gen.wilderness_ores').on_init
 
 --- Local Variables
 local player_kill_reward = config.player_kill_reward
@@ -81,8 +84,8 @@ end
 
 --- Main init function for the mini game
 local function init(args)
-    primitives.players_needed = args[1]
-    primitives.startup_timer = args[2] * 3600
+    primitives.players_needed = tonumber(args[1])
+    primitives.startup_timer = tonumber(args[2]) * 3600
     game.difficulty_settings.technology_price_multiplier = 0.5
 
     local force_USA = game.create_force('United Factory Workers')
@@ -100,10 +103,8 @@ local function init(args)
     force_USSR.research_queue_enabled = true
     force_USA.research_queue_enabled = true
 
-    force_USSR.chart(surface, {{x = 380, y = 64}, {x = 420, y = -64}})
-    force_USA.chart(surface, {{x = -380, y = 64}, {x = -420, y = -64}})
-
-    --game.forces.player.chart(MS.get_surface(), {{x = 400, y = 65}, {x = -400, y = -33}})
+    surface.request_to_generate_chunks({400, 0}, 3)
+    surface.request_to_generate_chunks({-400, 0}, 3)
 
     local market
     market = surface.create_entity {name = 'market', position = {x = 404, y = 0}, force = force_USSR}
@@ -192,6 +193,11 @@ local function init(args)
 
     Public.remove_recipes()
     Public.update_gui()
+    safe_ore_gen_on_init()
+    wild_ore_gen_on_init()
+    if uranium_gen_events.on_init then
+        uranium_gen_events.on_init()
+    end
 end
 
 --- Respawn a character making sure it has the correct items and permission group
@@ -272,17 +278,27 @@ local function generate_structures()
 end
 
 --- Used to start the game after the map has been generated and teams assigned
+local get_teleport_location
 local function start_game()
     primitives.game_started = true
     primitives.started_tick = game.tick
     game.forces.enemy.evolution_factor = 0
-    for _, player in pairs(primitives.force_USA.players) do
-        restore_character(player)
-    end
-    for _, player in pairs(primitives.force_USSR.players) do
-        restore_character(player)
-    end
+
     local surface = MS.get_surface()
+    local force_USA = primitives.force_USA
+    force_USA.chart(surface, {{x = -380, y = 64}, {x = -420, y = -64}})
+    for _, player in pairs(force_USA.players) do
+        restore_character(player)
+        player.teleport(get_teleport_location(force_USA, true), MS.get_surface())
+    end
+
+    local force_USSR = primitives.force_USSR
+    force_USSR.chart(surface, {{x = 380, y = 64}, {x = 420, y = -64}})
+    for _, player in pairs(force_USSR.players) do
+        restore_character(player)
+        player.teleport(get_teleport_location(force_USSR, true), MS.get_surface())
+    end
+
     cliff.generate_cliffs(surface)
     surface.set_tiles(tiles)
     generate_structures()
@@ -296,7 +312,6 @@ local start_game_delayed = Token.register(function()
     if primitives.started_tick == -1 then
         primitives.started_tick = 0
         load_gui.remove_gui()
-        Event.remove_removable_nth_tick(60, check_map_gen_is_done)
         start_game()
     end
 end)
@@ -316,19 +331,21 @@ check_map_gen_is_done = Token.register(function()
         local surface = MS.get_surface()
         if
             primitives.started_tick ~= -1
-            and check_tile_type(surface,  388.5, 0,  'landfill')   and check_tile_type(surface, -388, 0,  'landfill')
-            and check_tile_type(surface,  388,   60, 'out-of-map') and check_tile_type(surface, -388, 60, 'out-of-map')
-            and check_tile_type(surface, -479,   0,  'water')      and check_tile_type(surface,  479, 0,  'water')
+            and check_tile_type(surface, 388.5, 0,  'landfill')   and check_tile_type(surface, -388, 0,  'landfill')
+            and check_tile_type(surface, 388,   60, 'out-of-map') and check_tile_type(surface, -388, 60, 'out-of-map')
+            and check_tile_type(surface, 479,   0,  'water')      and check_tile_type(surface, -479, 0,  'water')
         then
             primitives.started_tick = -1
             game.print('[color=yellow]Game starts in 10 seconds![/color]')
             Task.set_timeout_in_ticks(599, start_game_delayed, {})
+            Event.remove_removable_nth_tick(60, check_map_gen_is_done)
+            return load_gui.remove_gui()
         end
         load_gui.show_gui_to_all()
     else
         primitives.started_tick = nil
-        load_gui.remove_gui()
         Event.remove_removable_nth_tick(60, check_map_gen_is_done)
+        load_gui.remove_gui()
     end
 end)
 
@@ -352,7 +369,6 @@ local function check_ready_to_start()
 end
 
 --- Make a player join team usa
-local get_teleport_location
 function Public.join_usa(player)
     local force_USA = primitives.force_USA
 
@@ -378,8 +394,6 @@ function Public.join_usa(player)
 
     player.force = force_USA
     player.print('[color=green]You have joined United Factory Workers![/color]')
-    restore_character(player)
-    player.teleport(get_teleport_location(force_USA, true), MS.get_surface())
     check_ready_to_start()
     Public.update_gui()
     return true
@@ -411,8 +425,6 @@ function Public.join_ussr(player)
 
     player.force = force_USSR
     player.print('[color=green]You have joined Union of Factory Employees![/color]')
-    restore_character(player)
-    player.teleport(get_teleport_location(force_USSR, true), MS.get_surface())
     check_ready_to_start()
     Public.update_gui()
     return true
@@ -542,6 +554,11 @@ end
 --- Get an array of the teams
 function Public.get_teams()
     return {primitives.force_USA, primitives.force_USSR}
+end
+
+--- Get an array of the teams
+function Public.get_players_needed()
+    return primitives.players_needed
 end
 
 --- Get the game status
@@ -707,6 +724,9 @@ space_race:add_event(defines.events.on_player_died, market_events.on_player_died
 space_race:add_event(defines.events.on_research_finished, market_events.on_research_finished)
 space_race:add_event(Retailer.events.on_market_purchase, market_events.on_market_purchase)
 space_race:add_on_nth_tick(20, check_damaged_players)
+if uranium_gen_events.on_nth_tick then
+    space_race:add_on_nth_tick(600, uranium_gen_events.on_nth_tick)
+end
 
 space_race:set_gui_element(main_gui)
 space_race:set_gui_callback(gui_callback)

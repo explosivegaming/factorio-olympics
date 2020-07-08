@@ -1,8 +1,5 @@
 local Gui = require 'utils.gui'
 
-local config = require 'modules.mini-games.space_race.config'
-local players_needed = config.players_needed_to_start_game
-
 local Public = {}
 
 -- <Waiting GUI start>
@@ -46,6 +43,7 @@ function Public.show_gui(event)
     label_flow.style.horizontal_align = 'center'
 
     label_flow.style.horizontally_stretchable = true
+    local players_needed = remote.call('space-race', 'get_players_needed')
     local label = label_flow.add {type = 'label', caption = #game.connected_players .. ' out of ' .. players_needed .. ' players needed to begin!'}
     label.style.horizontal_align = 'center'
     label.style.single_line = false

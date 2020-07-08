@@ -1,6 +1,6 @@
 local b = require 'utils.map_gen.builders'
 
-local Map_gen_config = (require 'modules.mini-games.space_race.config').map_gen
+local Map_gen_config = (require 'config.mini_games.space_race').map_gen
 
 local width_1 = Map_gen_config.width_1
 local width_2 = Map_gen_config.width_2
@@ -21,7 +21,7 @@ landfill_water = b.change_map_gen_collision_tile(landfill_water, 'water-tile', '
 
 -- landfill_water = b.change_tile(landfill_water, true, 'lab-white')
 
-local safe_zone_resources = require 'modules.mini-games.space_race.map_gen.safe_zone_ores'
+local safe_zone_resources = require('modules.mini-games.space_race.map_gen.safe_zone_ores').shape
 
 limited_safe_zone = b.apply_entity(limited_safe_zone, safe_zone_resources)
 

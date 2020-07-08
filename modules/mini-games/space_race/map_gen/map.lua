@@ -4,7 +4,7 @@ local Map_gen_presets = require 'utils.map_gen.map_gen_settings'
 local perlin = require 'utils.map_gen.perlin_noise'
 local floor = math.floor
 
-local Map_gen_config = (require 'modules.mini-games.space_race.config').map_gen
+local Map_gen_config = (require 'config.mini_games.space_race').map_gen
 
 local uranium_none = {
     autoplace_controls = {
@@ -62,7 +62,7 @@ wilderness_shallow_water = b.change_tile(wilderness_shallow_water, true, 'water-
 
 wilderness_shallow_water = b.if_else(water_transition, wilderness_shallow_water)
 
-local uranium_island = require 'modules.mini-games.space_race.map_gen.uranium_island'
+local uranium_island = require('modules.mini-games.space_race.map_gen.uranium_island').shape
 
 wilderness_shallow_water = b.if_else(uranium_island, wilderness_shallow_water)
 
@@ -92,7 +92,7 @@ landfill_water = b.change_map_gen_collision_tile(landfill_water, 'water-tile', '
 landfill_water = b.subtract(landfill_water, b.translate(b.rectangle(256, 256), -256, 0))
 -- landfill_water = b.change_tile(landfill_water, true, 'lab-white')
 
-local wilderness_resources = require 'modules.mini-games.space_race.map_gen.wilderness_ores'
+local wilderness_resources = require('modules.mini-games.space_race.map_gen.wilderness_ores').shape
 
 local mirrored_water = wilderness_resources[2]
 local mirrored_ore = wilderness_resources[1]

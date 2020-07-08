@@ -1,9 +1,9 @@
 local b = require 'utils.map_gen.builders'
-local Event = require 'utils.event' -- TODO
 local Global = require 'utils.global'
 local MS = require 'utils.map_gen.minigame_surface'
 
-local Game_mode_config = (require 'modules.mini-games.space_race.config').game_mode
+local Game_mode_config = (require 'config.mini_games.space_race').game_mode
+local Events = {}
 
 local island_1_offset = 0
 local island_2_offset = -128
@@ -102,63 +102,58 @@ if Game_mode_config.king_of_the_hill then
         e.rotatable = false
     end
 
-    Event.on_init(
-        function()
-            local surface = MS.get_surface()
-            for k, entity in pairs(outpost_1) do
-                entity.position[2] = entity.position[2] + island_1_offset
-                entity.force = 'neutral'
-                local e = surface.create_entity(entity)
-                lock_entity(e)
-                if entity.recipe then
-                    e.set_recipe('low-density-structure')
-                    e.recipe_locked = true
-                    register_crafter(e)
-                end
-            end
-            for k, entity in pairs(outpost_2) do
-                entity.position[2] = entity.position[2] + island_2_offset
-                entity.force = 'neutral'
-                local e = surface.create_entity(entity)
-                lock_entity(e)
-                if entity.recipe then
-                    e.set_recipe('rocket-control-unit')
-                    e.recipe_locked = true
-                    register_crafter(e)
-                end
-            end
-            for k, entity in pairs(outpost_3) do
-                entity.position.y = entity.position.y + island_3_offset
-                entity.force = 'neutral'
-                local e = surface.create_entity(entity)
-                if not entity.amount then
-                    lock_entity(e)
-                end
-                if entity.recipe then
-                    e.set_recipe('rocket-fuel')
-                    e.recipe_locked = true
-                    e.direction = defines.direction.south
-                    register_crafter(e)
-                end
-                if entity.name == 'oil-refinery' then
-                    e.set_recipe('advanced-oil-processing')
-                    e.recipe_locked = true
-                end
+    Events.on_init = function()
+        local surface = MS.get_surface()
+        for k, entity in pairs(outpost_1) do
+            entity.position[2] = entity.position[2] + island_1_offset
+            entity.force = 'neutral'
+            local e = surface.create_entity(entity)
+            lock_entity(e)
+            if entity.recipe then
+                e.set_recipe('low-density-structure')
+                e.recipe_locked = true
+                register_crafter(e)
             end
         end
-    )
+        for k, entity in pairs(outpost_2) do
+            entity.position[2] = entity.position[2] + island_2_offset
+            entity.force = 'neutral'
+            local e = surface.create_entity(entity)
+            lock_entity(e)
+            if entity.recipe then
+                e.set_recipe('rocket-control-unit')
+                e.recipe_locked = true
+                register_crafter(e)
+            end
+        end
+        for k, entity in pairs(outpost_3) do
+            entity.position.y = entity.position.y + island_3_offset
+            entity.force = 'neutral'
+            local e = surface.create_entity(entity)
+            if not entity.amount then
+                lock_entity(e)
+            end
+            if entity.recipe then
+                e.set_recipe('rocket-fuel')
+                e.recipe_locked = true
+                e.direction = defines.direction.south
+                register_crafter(e)
+            end
+            if entity.name == 'oil-refinery' then
+                e.set_recipe('advanced-oil-processing')
+                e.recipe_locked = true
+            end
+        end
+    end
 
-    Event.on_nth_tick(
-        600,
-        function()
-            if remote.call('space-race', 'get_game_status') then
-                for _, crafter in pairs(crafters) do
-                    local item = crafter.get_recipe().products[1].name
-                    crafter.get_output_inventory().insert({name = item, count = 1})
-                end
+    Events.on_nth_tick = function()
+        if remote.call('space-race', 'get_game_status') then
+            for _, crafter in pairs(crafters) do
+                local item = crafter.get_recipe().products[1].name
+                crafter.get_output_inventory().insert({name = item, count = 1})
             end
         end
-    )
+    end
 end
 
-return multiple_uranium_island
+return { shape = multiple_uranium_island, events = Events }

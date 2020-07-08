@@ -28,7 +28,7 @@ Global.register(
     end
 )
 
-local config = require 'modules.mini-games.space_race.config'
+local config = require 'config.mini_games.space_race'
 
 local entity_kill_rewards = config.entity_kill_rewards
 local entity_kill_rewards_default = entity_kill_rewards['default']
