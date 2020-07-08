@@ -10,7 +10,6 @@ local MS = require 'utils.map_gen.minigame_surface'
 local Mini_games = require "expcore.Mini_games"
 local Gui = require 'expcore.Gui'
 local Commands = require 'expcore.commands'
-local Permission_Groups = require "expcore.permission_groups"
 
 --- Feature Requires
 local Retailer = require 'modules.mini-games.space_race.retailer'
