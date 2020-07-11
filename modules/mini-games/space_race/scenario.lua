@@ -8,7 +8,7 @@ local MS = require 'utils.map_gen.minigame_surface'
 
 --- Expcore Requires
 local Mini_games = require "expcore.Mini_games"
-local Gui = require 'expcore.Gui'
+local Gui = require 'expcore.gui'
 local Commands = require 'expcore.commands'
 
 --- Feature Requires
