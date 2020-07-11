@@ -4,7 +4,6 @@ local Commands = require 'expcore.commands'
 local Gui = require 'expcore.gui._require'
 require 'config.expcore.command_runtime_disable' --required to load befor running the script
 local Roles = require 'expcore.roles' --- @dep expcore.roles
-local Async = require 'expcore.async' --- @dep expcore.async
 
 local Mini_games = {}
 local main_gui = {}
@@ -203,7 +202,7 @@ function Mini_games.update_airtable(args)
     data.Bronze = args[5]
     data.Bronze_data = args[6]
     data.server = vars.server_adress
-    game.write_file("mini_games/end_game",game.table_to_json(data), false)
+    return game.table_to_json(data)
 end
 
 function Mini_games.stop_game(args)
@@ -240,8 +239,12 @@ function Mini_games.stop_game(args)
 
     local stop_func = mini_game.stop_function
     if stop_func then
-        local success, err =  pcall(stop_func)
-        internal_error(success,err)
+        local success, res =  pcall(stop_func)
+        if(not success)then
+            internal_error(success,res)
+        else
+            game.write_file("mini_games/end_game",game.table_to_json(res), false)
+        end
     end
 
     mini_game.vars = {}
