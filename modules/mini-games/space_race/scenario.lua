@@ -80,8 +80,8 @@ local function init(args)
     primitives.startup_timer = tonumber(args[2]) * 3600
     game.difficulty_settings.technology_price_multiplier = 0.5
 
-    local force_USA = game.create_force('United Factory Workers')
-    local force_USSR = game.create_force('Union of Factory Employees')
+    local force_USA = game.create_force(args[3] or 'United Factory Workers')
+    local force_USSR = game.create_force(args[4] or 'Union of Factory Employees')
 
     local surface = MS.generate_surface('Space_Race')
     surface.min_brightness = 0;
@@ -363,7 +363,7 @@ function Public.join_usa(player)
 
     local force = player.force
     if force == force_USA then
-        player.print('[color=red]Failed to join [/color][color=yellow]United Factory Workers,[/color][color=red] you are already part of this team![/color]')
+        player.print('[color=red]Failed to join [/color][color=yellow]'..force_USA.name..',[/color][color=red] you are already part of this team![/color]')
         return false
     end
 
@@ -376,13 +376,13 @@ function Public.join_usa(player)
         player.get_inventory(defines.inventory.character_guns).is_empty() and
         player.crafting_queue_size == 0
         if not empty_inventory then
-            player.print('[color=red]Failed to join [/color][color=yellow]United Factory Workers,[/color][color=red] you need an empty inventory![/color]')
+            player.print('[color=red]Failed to join [/color][color=yellow]'..force_USA.name..',[/color][color=red] you need an empty inventory![/color]')
             return false
         end
     end
 
     player.force = force_USA
-    player.print('[color=green]You have joined United Factory Workers![/color]')
+    player.print('[color=green]You have joined '..force_USA.name..'![/color]')
     check_ready_to_start()
     Public.update_gui()
     return true
@@ -394,7 +394,7 @@ function Public.join_ussr(player)
 
     local force = player.force
     if force == force_USSR then
-        player.print('[color=red]Failed to join [/color][color=yellow]United Factory Workers,[/color][color=red] you are already part of this team![/color]')
+        player.print('[color=red]Failed to join [/color][color=yellow]'..force_USSR.name..',[/color][color=red] you are already part of this team![/color]')
         return false
     end
 
@@ -407,13 +407,13 @@ function Public.join_ussr(player)
         player.get_inventory(defines.inventory.character_guns).is_empty() and
         player.crafting_queue_size == 0
         if not empty_inventory then
-            player.print('[color=red]Failed to join [/color][color=yellow]United Factory Workers,[/color][color=red] you need an empty inventory![/color]')
+            player.print('[color=red]Failed to join [/color][color=yellow]'..force_USSR.name..',[/color][color=red] you need an empty inventory![/color]')
             return false
         end
     end
 
     player.force = force_USSR
-    player.print('[color=green]You have joined Union of Factory Employees![/color]')
+    player.print('[color=green]You have joined '..force_USSR.name..'![/color]')
     check_ready_to_start()
     Public.update_gui()
     return true
@@ -677,12 +677,36 @@ Gui.element{
   width = 50
 }
 
+--- Text entry for the usa team name
+local text_field_for_usa_name =
+Gui.element{
+    type = 'textfield',
+    tooltip = 'Team One Name',
+    text = 'United Factory Workers',
+}
+:style{
+  width = 50
+}
+
+--- Text entry for the ussr team name
+local text_field_for_ussr_name =
+Gui.element{
+    type = 'textfield',
+    tooltip = 'Team Two Name',
+    text = 'Union of Factory Employees',
+}
+:style{
+  width = 50
+}
+
 --- Main gui for starting the game
 local main_gui =
 Gui.element(function(_,parent)
     local main_flow = parent.add{ type = 'flow', name = "Space_Race_flow"}
     text_field_for_players(main_flow)
     text_field_for_startup(main_flow)
+    text_field_for_usa_name(main_flow)
+    text_field_for_ussr_name(main_flow)
 end)
 
 --- Used to read args from the gui
@@ -692,6 +716,8 @@ local function gui_callback(parent)
 
     args[1] = tonumber(flow[text_field_for_players.name].text)
     args[2] = tonumber(flow[text_field_for_startup.name].text)
+    args[3] = flow[text_field_for_usa_name.name].text
+    args[4] = flow[text_field_for_ussr_name.name].text
 
     return args
 end
@@ -700,7 +726,7 @@ end
 local space_race = Mini_games.new_game("Space_Race")
 space_race:set_start_function(init)
 space_race:set_stop_function(stop_game)
-space_race:add_option(2)
+space_race:add_option(4)
 space_race:add_map('nauvis', -35, 55)
 
 space_race:add_event(defines.events.on_player_joined_game, on_player_joined)
