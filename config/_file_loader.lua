@@ -20,8 +20,10 @@ return {
     'modules.mini-games.admin_overide',
     'modules.mini-games.Race',
     'modules.mini-games.tightspot',
+    'modules.mini-games.space_race.scenario',
 
     -- Config Files
+    'config.map_loader',
     'config.expcore.command_auth_admin', -- commands tagged with admin_only are blocked for non admins
     'config.expcore.command_auth_roles', -- commands must be allowed via the role config
     'config.expcore.command_runtime_disable', -- allows commands to be enabled and disabled during runtime
