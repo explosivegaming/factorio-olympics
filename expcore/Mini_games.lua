@@ -243,7 +243,7 @@ function Mini_games.stop_game(args)
         if(not success)then
             internal_error(success,res)
         else
-            game.write_file("mini_games/end_game",game.table_to_json(res), false)
+            game.write_file("mini_games/end_game",res, false)
         end
     end
 
@@ -263,6 +263,7 @@ function Mini_games.error_in_game(error_game)
     Mini_games.stop_game()
     game.print("an error has occured things may be broken, error: "..error_game)
 end
+
 local kick_all =
 function()
     for i,player in ipairs(game.connected_players) do
@@ -286,12 +287,12 @@ Commands.new_command('set_lobby','Command to stop a mini_game.')
 :register(function(_,_,data)
     vars.is_lobby = data
 end)
+
 Commands.new_command('set_server_address','Command to stop a mini_game.')
 :add_param('data',false)
 :register(function(_,_,data)
     vars.server_adress = data
 end)
-
 local mini_game_list
 --gui
 

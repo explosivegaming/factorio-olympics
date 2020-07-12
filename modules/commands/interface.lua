@@ -18,7 +18,7 @@ local interface_modules = {
     ['Async']    = 'expcore.async',
     ['Store']    = 'expcore.store',
     ['Game']     = 'utils.game',
-    ['mini_games'] = "expcore.mini_games"
+    ['mini_games'] = "expcore.Mini_games"
 }
 
 --- Loads all the modules given in the above table

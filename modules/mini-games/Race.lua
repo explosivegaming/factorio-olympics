@@ -1,4 +1,4 @@
-local Mini_games        = require "expcore.Mini_games"
+local Mini_games = require "expcore.Mini_games"
 local Token             = require "utils.token"
 local task              = require "utils.task"
 local Permission_Groups = require "expcore.permission_groups"
