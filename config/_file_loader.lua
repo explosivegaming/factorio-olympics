@@ -14,6 +14,7 @@ return {
 
     --Gui
     'modules.gui.server-ups',
+    'modules.gui.player-list',
 
     --Mini-games
     'modules.mini-games.greefer-start',

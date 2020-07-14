@@ -17,15 +17,14 @@ local Mini_games = {
     }
 }
 
-local participants = { state = 'Closed' }
-local main_gui = {}
-local primitives = {}
+local participants = {}
+local primitives = { state = 'Closed' }
 local vars = {
     is_lobby = false,
     server_address = ""
 }
 
-global.servers= {}
+global.servers = {}
 --[[
 global.servers= {
     lobby =  "127.0.0.1:12345"
@@ -36,11 +35,10 @@ global.servers= {
 Global.register({
     participants = participants,
     primitives = primitives,
-    main_gui = main_gui,
     vars = vars,
 },function(tbl)
+    participants = tbl.participants
     primitives = tbl.primitives
-    main_gui = tbl.main_gui
     vars = tbl.vars
 end)
 
@@ -144,9 +142,17 @@ function Mini_games.get_participants()
     return participants
 end
 
---- Remove a participant from a game, this moves them into spectators
+--- Remove a participant from a game, can be called during on_participant_left
 function Mini_games.remove_participant(player)
-    -- todo place into spectator if no game is running
+    if player.character then player.character.destroy() end
+    if primitives.state == 'Started' then
+        player.set_controller{ type = defines.controllers.god }
+    elseif primitives.current_game then
+        local surface = game.surfaces.nauvis
+        local pos = surface.find_non_colliding_position('character', {-35, 55}, 6, 1)
+        player.create_character()
+        player.teleport(pos, surface)
+    end
     return Roles.unassign_player(player, 'Participant', nil, nil, true) -- silent
 end
 
@@ -200,7 +206,8 @@ Event.add(defines.events.on_player_joined_game, function(event)
             started = started
         })
     elseif started then
-        -- todo place non participants into spectator
+        if player.character then player.character.destroy() end
+        player.set_controller{ type = defines.controllers.god }
     end
 end)
 
@@ -215,7 +222,10 @@ Event.add(defines.events.on_player_left_game, function(event)
             started = primitives.state == 'Started'
         })
     elseif primitives.current_game then
-        -- todo move non participants to lobby
+        if player.character then player.character.destroy() end
+        local pos = surface.find_non_colliding_position('character', spawn, 6, 1)
+        player.create_character()
+        player.teleport(pos, surface)
     end
 end)
 
@@ -247,7 +257,10 @@ local start_game = Token.register(function()
     local mini_game = Mini_games.mini_games[primitives.current_game]
     primitives.start_tick = game.tick
 
-    -- todo place non participants into spectator
+    for _, player in ipairs(game.connected_players) do
+        if player.character then player.character.destroy() end
+        player.set_controller{ type = defines.controllers.god }
+    end
 
     local on_start = mini_game.core_events.on_start
     if on_start then
@@ -279,6 +292,7 @@ function Mini_games.show_loading_screen(player)
     LoadingGui.show_gui({ player_index = player.index }, primitives.current_game)
 end
 
+--- Starts a mini game if no other games are running
 function Mini_games.start_game(name, args)
     if vars.is_lobby then return start_from_lobby(name, args) end
 
@@ -350,7 +364,9 @@ local close_game = Token.register(function()
     local spawn = {-35, 55}
     local surface = game.surfaces.nauvis
     for _, player in ipairs(game.connected_players) do
+        if player.character then player.character.destroy() end
         local pos = surface.find_non_colliding_position('character', spawn, 6, 1)
+        player.create_character()
         player.teleport(pos, surface)
         Gui.update_top_flow(player)
     end
