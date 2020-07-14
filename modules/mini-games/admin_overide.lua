@@ -13,8 +13,6 @@ Commands.new_command('start', 'Command to start a mini_game.')
 :add_param('option3', true)
 :add_param('option4', true)
 :register(function(_, name_of_game, option1, option2, option3, option4, _)
-    local error_message = Mini_games.start_game(name_of_game, {option1, option2, option3, option4})
-    if error_message then
-        return Commands.error(error_message)
-    end
+    local _, rtn = xpcall(Mini_games.start_game, Commands.error, name_of_game, {option1, option2, option3, option4})
+    return rtn
 end)

@@ -737,9 +737,9 @@ space_race:add_event(defines.events.on_entity_died, market_events.on_entity_died
 space_race:add_event(defines.events.on_player_died, market_events.on_player_died)
 space_race:add_event(defines.events.on_research_finished, market_events.on_research_finished)
 space_race:add_event(Retailer.events.on_market_purchase, market_events.on_market_purchase)
-space_race:add_on_nth_tick(20, check_damaged_players)
+space_race:on_nth_tick(20, check_damaged_players)
 if uranium_gen_events.on_nth_tick then
-    space_race:add_on_nth_tick(600, uranium_gen_events.on_nth_tick)
+    space_race:on_nth_tick(600, uranium_gen_events.on_nth_tick)
 end
 
 space_race:set_gui_element(main_gui)

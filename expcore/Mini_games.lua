@@ -1,194 +1,332 @@
 local Token = require 'utils.token'
+local Task = require 'utils.task'
 local Event = require 'utils.event'
+local Global = require 'utils.global'
 local Commands = require 'expcore.commands'
-local Gui = require 'expcore.gui._require'
-require 'config.expcore.command_runtime_disable' --required to load befor running the script
+local Gui = require 'expcore.gui'
 local Roles = require 'expcore.roles' --- @dep expcore.roles
+require 'config.expcore.command_runtime_disable' --required to load before running the script
 
-local Mini_games = {}
+local LoadingGui = require 'modules.gui.mini_game_loading'
+local Mini_games = {
+    _prototype = {},
+    mini_games = {},
+    events = {
+        on_participant_joined = script.generate_event_name(),
+        on_participant_left = script.generate_event_name()
+    }
+}
+
+local participants = { state = 'Closed' }
 local main_gui = {}
-local started_game = {}
-local vars = {}
-vars.is_lobby = false
-vars.server_adress = ""
+local primitives = {}
+local vars = {
+    is_lobby = false,
+    server_address = ""
+}
+
 global.servers= {}
 --[[
 global.servers= {
     lobby =  "127.0.0.1:12345"
 }
 --]]
-local Global = require 'utils.global' --Used to prevent desynicing.
+
+--- Register the global variables
 Global.register({
-    started_game = started_game,
+    participants = participants,
+    primitives = primitives,
     main_gui = main_gui,
     vars = vars,
 },function(tbl)
-    started_game = tbl.started_game
+    primitives = tbl.primitives
     main_gui = tbl.main_gui
     vars = tbl.vars
 end)
 
-Mini_games["mini_games"] = {}
-Mini_games["_prototype"] = {}
-
-
-local function internal_error(success,error_message)
-    if not success and error_message then
-        game.print("Their is an error please contact the admins, error: "..error_message)
-        log(error_message)
-    end
+--- Used with xpcall
+local function internal_error(error_message)
+    game.print("Their is an error please contact the admins, error: "..error_message)
+    log(debug.traceback(error_message))
+    primitives.state = 'Error'
 end
 
+----- Defining Mini games -----
 
+--- Create a new instance of a mini game
 function Mini_games.new_game(name)
-    local mini_game = setmetatable({
-        name=name,
-        events = {},
-        onth_tick = {},
-        commands = {},
-        start_function= nil,
-        stop_function = nil,
-        map = nil,
-        positon = {},
-        options = 0,
-        gui = nil,
-        gui_callback = nil,
-    }, {
-        __index= Mini_games._prototype
-    })
+    local mini_game = {
+        name        = name,
+        events      = {},
+        on_nth_tick = {},
+        commands    = {},
+        core_events = {},
+        options      = 0,
+    }
+
     Mini_games.mini_games[name] = mini_game
-    return mini_game
+    return setmetatable(mini_game, { __index = Mini_games._prototype })
 end
 
-function Mini_games._prototype:add_on_nth_tick(tick,func)
-    local handler = Token.register(
-        func
-    )
-    self.onth_tick[#self.onth_tick+1] = {tick,handler}
+--- Add an event handler to this mini game
+function Mini_games._prototype:add_event(event_name, func)
+    local handler = Token.register(func)
+    self.events[#self.events+1] = {event_name, handler}
 end
 
-
-function Mini_games._prototype:set_start_function(start_function)
-
-    self.start_function = start_function
+--- Add an on nth tick handler to this mini game
+function Mini_games._prototype:on_nth_tick(tick, func)
+    local handler = Token.register(func)
+    self.on_nth_tick[#self.on_nth_tick+1] = {tick, handler}
 end
+
+--- Add an on init handler to this mini game
+function Mini_games._prototype:on_init(handler)
+    self.core_events.on_init = handler
+end
+
+--- Add an on start handler to this mini game
+function Mini_games._prototype:on_start(handler)
+    self.core_events.on_start = handler
+end
+
+--- Add an on stop handler to this mini game
+function Mini_games._prototype:on_stop(handler)
+    self.core_events.on_stop = handler
+end
+
+--- Add an on close handler to this mini game
+function Mini_games._prototype:on_close(handler)
+    self.core_events.on_close = handler
+end
+
+--- Add an to the allowed number of options for this mini game
 function Mini_games._prototype:add_option(amount)
-
-    self.options = self.options+amount
+    self.options = self.options + amount
 end
 
-
-function Mini_games._prototype:set_stop_function(stop_function)
-    self.stop_function = stop_function
+--- Add a callback to check if the mini game is ready to start, if not used game starts after init
+function Mini_games._prototype:set_ready_condition(callback)
+    self.ready_condition = callback
 end
-function Mini_games._prototype:set_gui_element(gui_element)
+
+--- Add a gui element to be used in the vote gui
+function Mini_games._prototype:set_gui_element(gui_element, gui_callback)
     self.gui = gui_element
+    self.gui_callback = gui_callback
 end
 
-function Mini_games._prototype:set_gui_callback(callback)
-    self.gui_callback = callback
-end
-
+--- Add a command that can only be used in this mini game
 function Mini_games._prototype:add_command(command_name)
     self.commands[#self.commands + 1] = command_name
     Commands.disable(command_name)
 end
-function Mini_games._prototype:add_map(map,x,y)
-    self.map = map
-    self.positon.x = x
-    self.positon.y = y
-end
 
-function Mini_games._prototype:add_event(event_name,func)
-    local handler = Token.register(func)
-    self.events[#self.events+1] = {handler,event_name}
-end
+----- Public Variables -----
 
+--- Get the currently running game
 function Mini_games.get_running_game()
-    return started_game[1]
+    return primitives.current_game
 end
-function Mini_games.start_game(name,parse_args)
-    if vars.is_lobby then
-        local player_names = {}
-        local server_object = global.servers[name]
-        local server = server_object[#server_object]
-        for _, player in ipairs(game.connected_players) do
-            player.connect_to_server{address=server,name=name}
-            player_names[#player_names+1 ] = player.name
-        end
-        --data
-        local data = {
-            type = "Started_game",
-            players = player_names,
-            name = name,
-            arguments = parse_args,
-            server = server,
-        }
-        game.write_file("mini_games/starting_game", game.table_to_json(data), false)
-    else
-        local mini_game = Mini_games.mini_games[name]
-        if mini_game == nil then
-            return "This mini_game does not exsit"
-        end
 
-        if parse_args then
-            if  mini_game.options ~= #parse_args then
-                return "Wrong number of arguments"
-            end
-        else
-            if mini_game.options ~= 0 then
-                return "Wrong number of arguments"
-            end
-        end
+--- Get the current state of the mini game server
+function Mini_games.get_current_state()
+    return primitives.state
+end
 
-        if started_game[1] == name then
-            return "This game is already running"
-        end
+--- Get the start time for the running game
+function Mini_games.get_start_time()
+    return primitives.start_tick
+end
 
-        if mini_game.map == nil then
-            error("No map set")
-        end
+--- Get all the participants in a game
+function Mini_games.get_participants()
+    return participants
+end
 
-        if started_game[1] then
-            Mini_games.stop_game(started_game[1])
-        end
+--- Remove a participant from a game, this moves them into spectators
+function Mini_games.remove_participant(player)
+    -- todo place into spectator if no game is running
+    return Roles.unassign_player(player, 'Participant', nil, nil, true) -- silent
+end
 
-        for _, player in ipairs(game.connected_players) do
-            player.teleport({mini_game.positon.x,mini_game.positon.y},mini_game.map)
-        end
+--- Add a participant
+local function add_participant(player)
+    for _, nextPlayer in ipairs(participants) do
+        if nextPlayer == player then return end
+    end
+    participants[#participants+1] = player
+end
 
-        started_game[1] = name
-
-        for i,value  in ipairs(mini_game.events) do
-            local handler = value[1]
-            local event_name = value[2]
-            Event.add_removable(event_name,handler)
-        end
-
-        for i,value  in ipairs(mini_game.onth_tick) do
-            local tick = value[1]
-            local token = value[2]
-            Event.add_removable_nth_tick(tick, token)
-        end
-
-        if mini_game.commands then
-            for i,command_name  in ipairs(mini_game.commands) do
-                Commands.enable(command_name)
-            end
-        end
-
-        local start_func = mini_game.start_function
-        if start_func then
-            if parse_args then
-                local success, err = pcall(start_func,parse_args)
-                internal_error(success,err)
-            else
-                local success, err = pcall(start_func)
-                internal_error(success,err)
-            end
+--- Remove a participant
+local function remove_participant(player)
+    for index, nextPlayer in ipairs(participants) do
+        if nextPlayer == player then
+            participants[index] = participants[#participants]
+            participants[#participants] = nil
+            return
         end
     end
 end
+
+--- Triggered when a player is assigned new roles, adds to participants if assigned to Participant role
+Event.add(Roles.events.on_role_assigned, function(event)
+    for _, role in ipairs(event.roles) do
+        if role.name == 'Participant' then
+            return add_participant(game.players[event.player_index])
+        end
+    end
+end)
+
+--- Triggered when a player is unassigned from roles, removes from participants if unassigned from Participant role
+Event.add(Roles.events.on_role_unassigned, function(event)
+    for _, role in ipairs(event.roles) do
+        if role.name == 'Participant' then
+            return remove_participant(game.players[event.player_index])
+        end
+    end
+end)
+
+--- Triggered when a player joins the game, will trigger on_participant_joined if there is a game running
+Event.add(defines.events.on_player_joined_game, function(event)
+    local player  = game.players[event.player_index]
+    local started = primitives.state == 'Started'
+    if Roles.player_has_role(player, 'Participant') then
+        add_participant(player)
+        script.raise_event(Mini_games.events.on_participant_joined, {
+            name = Mini_games.events.on_participant_joined,
+            player_index = player.index,
+            tick = game.tick,
+            started = started
+        })
+    elseif started then
+        -- todo place non participants into spectator
+    end
+end)
+
+--- Triggered when a player leaves the game, will trigger on_participant_left if there is a game running
+Event.add(defines.events.on_player_left_game, function(event)
+    local player = game.players[event.player_index]
+    if Roles.player_has_role(player, 'Participant') then
+        script.raise_event(Mini_games.events.on_participant_left, {
+            name = Mini_games.events.on_participant_left,
+            player_index = player.index,
+            tick = game.tick,
+            started = primitives.state == 'Started'
+        })
+    elseif primitives.current_game then
+        -- todo move non participants to lobby
+    end
+end)
+
+----- Starting Mini Games -----
+
+--- Start a mini game from the lobby server
+local function start_from_lobby(name, args)
+    local participant_names = {}
+    local server_object  = global.servers[name]
+    local server_address = server_object[#server_object]
+    for index, player in ipairs(participants) do
+        player.connect_to_server{ address = server_address, name = name }
+        participant_names[index] = player.name
+    end
+
+    local data = {
+        type      = 'Started_game',
+        players   = participant_names,
+        name      = name,
+        arguments = args,
+        server    = server_address
+    }
+
+    game.write_file('mini_games/starting_game', game.table_to_json(data), false)
+end
+
+--- Start a mini game from this server
+local start_game = Token.register(function()
+    local mini_game = Mini_games.mini_games[primitives.current_game]
+    primitives.start_tick = game.tick
+
+    -- todo place non participants into spectator
+
+    local on_start = mini_game.core_events.on_start
+    if on_start then
+        xpcall(on_start, internal_error)
+    end
+
+    primitives.state = 'Started'
+end)
+
+--- Check if the game is ready to start
+local check_ready
+check_ready = Token.register(function()
+    local mini_game = Mini_games.mini_games[primitives.current_game]
+    local success, ready = xpcall(mini_game.ready_condition, internal_error)
+    if not success then
+        Event.remove_removable_nth_tick(60, check_ready)
+    elseif ready then
+        Event.remove_removable_nth_tick(60, check_ready)
+        game.print('Game starts in 10 seconds')
+        Task.set_timeout(10, start_game)
+        LoadingGui.remove_gui()
+    else
+        LoadingGui.update_gui(primitives.start_tick)
+    end
+end)
+
+--- Show the loading screen to a player
+function Mini_games.show_loading_screen(player)
+    LoadingGui.show_gui({ player_index = player.index }, primitives.current_game)
+end
+
+function Mini_games.start_game(name, args)
+    if vars.is_lobby then return start_from_lobby(name, args) end
+
+    args = args or {}
+    local mini_game = assert(Mini_games.mini_games[name], 'This mini game does not exist')
+    assert(mini_game.options == #args, 'Wrong number of arguments')
+    assert(primitives.current_game, 'A game is already running, please use /stop')
+    primitives.current_game = name
+    primitives.start_tick = game.tick
+    primitives.state = 'Loading'
+
+    for _, event in ipairs(mini_game.events) do
+        -- event = { event_name, handler }
+        Event.add_removable(unpack(event))
+    end
+
+    for _, event in ipairs(mini_game.on_nth_tick) do
+        -- event = { tick, handler }
+        Event.add_removable_nth_tick(unpack(event))
+    end
+
+    for _, command_name  in ipairs(mini_game.commands) do
+        Commands.enable(command_name)
+    end
+
+    local on_init = mini_game.core_events.on_init
+    if on_init then
+        xpcall(on_init, internal_error, args)
+    end
+
+    for _, player in ipairs(participants) do
+        script.raise_event(Mini_games.events.on_participant_joined, {
+            name = Mini_games.events.on_participant_joined,
+            player_index = player.index,
+            tick = game.tick,
+            started = false
+        })
+    end
+
+    if mini_game.ready_condition then
+        Event.add_removable_nth_tick(60, check_ready)
+    else
+        game.print('Game starts in 10 seconds')
+        Task.set_timeout(10, start_game)
+    end
+end
+
+----- Stopping Mini Games -----
 
 function Mini_games.format_airtable(args)
     local data = {
@@ -199,111 +337,117 @@ function Mini_games.format_airtable(args)
         Silver_data=args[4],
         Bronze=args[5],
         Bronze_data=args[6],
-        server=vars.server_adress,
+        server=vars.server_address,
     }
     return game.table_to_json(data)
 end
 
-function Mini_games.stop_game()
-    local mini_game = Mini_games.mini_games[started_game[1]]
+--- Start a mini game from this server
+local close_game = Token.register(function()
+    local mini_game = Mini_games.mini_games[primitives.current_game]
+    primitives.current_game = nil
 
-    started_game[1] = nil
-    for i,value  in ipairs(mini_game.events) do
-        local handler = value[1]
-        local event_name = value[2]
-        Event.remove_removable(event_name, handler)
-    end
-
-    for i,value  in ipairs(mini_game.onth_tick) do
-        local tick = value[1]
-        local token = value[2]
-        Event.remove_removable_nth_tick(tick, token)
-    end
-
+    local spawn = {-35, 55}
+    local surface = game.surfaces.nauvis
     for _, player in ipairs(game.connected_players) do
-        player.teleport({-35,55},"nauvis")
-    end
-
-    local stop_func = mini_game.stop_function
-    if stop_func then
-        local success, res =  pcall(stop_func)
-        if(not success)then
-            internal_error(success,res)
-        else
-            game.write_file("mini_games/end_game",res, false)
-        end
-    end
-
-    mini_game.vars = {}
-    for i,command_name  in ipairs(mini_game.commands) do
-        Commands.disable(command_name)
-    end
-
-    for i,player in ipairs(game.connected_players) do
+        local pos = surface.find_non_colliding_position('character', spawn, 6, 1)
+        player.teleport(pos, surface)
         Gui.update_top_flow(player)
     end
 
-end
+    local on_close = mini_game.core_events.on_close
+    if on_close then
+        xpcall(on_close, internal_error)
+    end
 
+    primitives.state = 'Closed'
+end)
+
+function Mini_games.stop_game()
+    local mini_game = Mini_games.mini_games[primitives.current_game]
+    primitives.state = 'Stopping'
+
+    for _, event in ipairs(mini_game.events) do
+        -- event = { event_name, handler }
+        Event.remove_removable(unpack(event))
+    end
+
+    for _, event in ipairs(mini_game.on_nth_tick) do
+        -- event = { tick, handler }
+        Event.remove_removable_nth_tick(unpack(event))
+    end
+
+    for _, command_name  in ipairs(mini_game.commands) do
+        Commands.enable(command_name)
+    end
+
+    local on_stop = mini_game.core_events.on_stop
+    if on_stop then
+        local success, res = xpcall(on_stop, internal_error)
+        if success then
+            game.write_file('mini_games/end_game', res, false)
+        end
+    end
+
+    game.print('Returning to lobby')
+    Task.set_timeout(10, close_game)
+
+end
 
 function Mini_games.error_in_game(error_game)
+    game.print("an error has occurred things may be broken, error: "..error_game)
     Mini_games.stop_game()
-    game.print("an error has occured things may be broken, error: "..error_game)
 end
 
-local kick_all =
-function()
+----- Commands and Gui -----
+
+--- Kicks all players from the game
+Commands.new_command('kick_all','Kicks all players.')
+:register(function(_,_)
     for i,player in ipairs(game.connected_players) do
         game.kick_player(player,"You cant stay here")
     end
-end
-
-Commands.new_command('kick_all','Kicks all players.')
-:register(function(_,_)
-    kick_all()
 end)
 
+--- Sends all players back to the lobby server
 Commands.new_command('stop_games','Send everyone to the looby.')
 :register(function(_,_)
     for i,player in ipairs(game.connected_players) do
-        player.connect_to_server{address=global.servers["lobby"],name="lobby"}
+        player.connect_to_server{ address=global.servers["lobby"], name="lobby" }
     end
 end)
+
+--- Sets if this server is the lobby
 Commands.new_command('set_lobby','Command to tell this server if its the lobby.')
 :add_param('data',"boolean")
 :register(function(_,data,_)
     vars.is_lobby = data
 end)
 
+--- Sets the address of this server
 Commands.new_command('set_server_address','Command to set the ip:port of this server.')
 :add_param('data',false)
 :register(function(_,_,data)
-    vars.server_adress = data
+    vars.server_address = data
 end)
-local mini_game_list
---gui
 
+--- Used to start a mini game
+local mini_game_list
 local on_vote_click = function (_,element,_)
     local name = element.parent.name
     local scroll_table = element.parent.parent
     local mini_game = Mini_games.mini_games[name]
     local args
     if mini_game.gui_callback then
-        args = mini_game.gui_callback(scroll_table)
+        args = mini_game.gui_callback(scroll_table[name..'_flow'])
     end
 
-    for i,connected_player in ipairs(game.connected_players) do
-        main_gui[i] = Gui.get_left_element(connected_player,mini_game_list)
-        Gui.toggle_left_element(connected_player,main_gui[1],false)
-    end
-
-    Mini_games.start_game(name,args)
-    for i,connected_player in ipairs(game.connected_players) do
-        Gui.update_top_flow(connected_player)
+    Mini_games.start_game(name, args)
+    for _, player in ipairs(game.connected_players) do
+        Gui.toggle_left_element(player, mini_game_list, false)
+        Gui.update_top_flow(player)
     end
 end
-
-
 
 local vote_button =
 Gui.element{
@@ -313,23 +457,26 @@ Gui.element{
 }
 :on_click(on_vote_click)
 
-
+--- Adds the base that a mini game will add onto
 local add_mini_game =
 Gui.element(function(_,parent,name)
     local vote_flow = parent.add{ type = 'flow', name = name }
     vote_flow.style.padding = 0
     vote_button(vote_flow)
+
     parent.add{
         type = "label",
         caption = name,
         style ="heading_1_label"
     }
+
     local mini_game = Mini_games.mini_games[name]
     if mini_game.gui then
-        mini_game.gui(parent)
+        mini_game.gui(parent.add{ type = 'flow', name = name..'_flow' })
     end
 end)
 
+--- Main gui to select a mini game from
 mini_game_list =
 Gui.element(function(event_trigger,parent)
     local container = Gui.container(parent,event_trigger,200)
@@ -349,29 +496,8 @@ Gui.element(function(event_trigger,parent)
 end)
 :add_to_left_flow(false)
 
-Gui.left_toolbar_button('utility/check_mark','Nothing to see here',mini_game_list,function(player)  return Roles.player_allowed(player,'gui/game_start') and not started_game[1] end)
-
-
-
-
---[[
-local example_button =
-Gui.element{
-    type = 'button',
-    caption = 'Example Button'
-}
-:on_click(function(player,element,event)
-    -- player is the player who interacted with the element to cause the event
-    -- element is a refrence to the element which caused the event
-     --event is a raw refrence to the event data if player and element are not enough
-    game.print("lol")
+Gui.left_toolbar_button('utility/check_mark', 'Select a mini game to start', mini_game_list, function(player)
+    return Roles.player_allowed(player,'gui/game_start') and not primitives.current_game
 end)
-:add_to_left_flow(true)
-Gui.left_toolbar_button('entity/inserter', 'Nothing to see here', example_button)
-
---left_toolbar_button
-]]
-
 
 return Mini_games
-
