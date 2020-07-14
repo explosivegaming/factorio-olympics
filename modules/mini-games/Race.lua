@@ -267,14 +267,15 @@ local function stop()
         local place = Nth(value[1])
         local colour = colors[place] or colors.default
         if colour ~= colors.default then
-            airtable[value[1] + (value[1]-1)] = name
-            airtable[value[1] * 2] = math.round(time,2)
+            local index = value[1] * 2
+            airtable[index-1] = name
+            airtable[index] = math.round(time,2)
         end
         game.print(message_format:format(place, name, time), colour)
     end
     reset_globals()
 
-    return Mini_games.update_airtable(airtable)
+    return Mini_games.format_airtable(airtable)
 end
 
 --- AABB logic for if a position is in a box

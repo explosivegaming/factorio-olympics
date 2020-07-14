@@ -399,15 +399,18 @@ local function stop()
         local money = score[1]
         local player_name = score[2]
         local place = Nth(i)
-        airtable[i + (i-1)] = score[2]
-        airtable[i * 2] = math.round(money,2)
+
+        local index = i*2
+        airtable[index-1] = score[2]
+        airtable[index] = math.round(money,2)
+
         local colour = colors[place] or colors.default
         game.print(message_format:format(place, player_name, money), colour)
     end
 
     -- Reset the global values
     reset_globals()
-    return Mini_games.update_airtable(airtable)
+    return Mini_games.format_airtable(airtable)
 end
 
 --- Triggered when an entity is placed

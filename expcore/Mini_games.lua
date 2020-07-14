@@ -108,10 +108,7 @@ function Mini_games.get_running_game()
     return started_game[1]
 end
 function Mini_games.start_game(name,parse_args)
-    game.print(parse_args)
-    game.print(vars.is_lobby )
-    if vars.is_lobby == true  or vars.is_lobby =="true" then
-        game.print('hi')
+    if vars.is_lobby then
         local player_names = {}
         local server_object = global.servers[name]
         local server = server_object[#server_object]
@@ -120,12 +117,13 @@ function Mini_games.start_game(name,parse_args)
             player_names[#player_names+1 ] = player.name
         end
         --data
-        local data = {}
-        data.type = "Started_game"
-        data.players = player_names
-        data.name = name
-        data.arguments = parse_args
-        data.server = server
+        local data = {
+            type = "Started_game",
+            players = player_names,
+            name = name,
+            arguments = parse_args,
+            server = server,
+        }
         game.write_file("mini_games/starting_game", game.table_to_json(data), false)
     else
         local mini_game = Mini_games.mini_games[name]
@@ -192,33 +190,22 @@ function Mini_games.start_game(name,parse_args)
     end
 end
 
-function Mini_games.update_airtable(args)
-    local data = {}
-    data.type = "end_game"
-    data.Gold = args[1]
-    data.Gold_data = args[2]
-    data.Silver = args[3]
-    data.Silver_data = args[4]
-    data.Bronze = args[5]
-    data.Bronze_data = args[6]
-    data.server = vars.server_adress
+function Mini_games.format_airtable(args)
+    local data = {
+        type="end_game",
+        Gold=args[1],
+        Gold_data=args[2],
+        Silver=args[3],
+        Silver_data=args[4],
+        Bronze=args[5],
+        Bronze_data=args[6],
+        server=vars.server_adress,
+    }
     return game.table_to_json(data)
 end
 
-function Mini_games.stop_game(args)
+function Mini_games.stop_game()
     local mini_game = Mini_games.mini_games[started_game[1]]
-    if args then
-        local data = {}
-        data.type = "end_game"
-        data.Gold = args[1]
-        data.Gold_data = args[2]
-        data.Silver = args[3]
-        data.Silver_data = args[4]
-        data.Bronze = args[5]
-        data.Bronze_data = args[5]
-        data.server = vars.server_adress
-        game.write_file("mini_games/end_game",game.table_to_json(data), false)
-    end
 
     started_game[1] = nil
     for i,value  in ipairs(mini_game.events) do
@@ -271,24 +258,24 @@ function()
     end
 end
 
-Commands.new_command('kill_all','Command to stop a mini_game.')
+Commands.new_command('kick_all','Kicks all players.')
 :register(function(_,_)
     kick_all()
 end)
 
-Commands.new_command('stop_games','Command to stop a mini_game.')
+Commands.new_command('stop_games','Send everyone to the looby.')
 :register(function(_,_)
     for i,player in ipairs(game.connected_players) do
         player.connect_to_server{address=global.servers["lobby"],name="lobby"}
     end
 end)
-Commands.new_command('set_lobby','Command to stop a mini_game.')
+Commands.new_command('set_lobby','Command to tell this server if its the lobby.')
 :add_param('data',"boolean")
-:register(function(_,_,data)
+:register(function(_,data,_)
     vars.is_lobby = data
 end)
 
-Commands.new_command('set_server_address','Command to stop a mini_game.')
+Commands.new_command('set_server_address','Command to set the ip:port of this server.')
 :add_param('data',false)
 :register(function(_,_,data)
     vars.server_adress = data
