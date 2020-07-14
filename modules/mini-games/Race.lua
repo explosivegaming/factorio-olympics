@@ -1,4 +1,4 @@
-local Mini_games        = require "expcore.Mini_games"
+local Mini_games = require "expcore.Mini_games"
 local Token             = require "utils.token"
 local task              = require "utils.task"
 local Permission_Groups = require "expcore.permission_groups"
@@ -261,15 +261,21 @@ local function stop()
     end
 
     -- Print the place that each player came
+    local airtable = {}
     for name, value in pairs(scores["finish_times"]) do
         local time = value[2]
         local place = Nth(value[1])
         local colour = colors[place] or colors.default
+        if colour ~= colors.default then
+            local index = value[1] * 2
+            airtable[index-1] = name
+            airtable[index] = math.round(time,2)
+        end
         game.print(message_format:format(place, name, time), colour)
     end
-
-    -- Reset the global values
     reset_globals()
+
+    return Mini_games.format_airtable(airtable)
 end
 
 --- AABB logic for if a position is in a box

@@ -394,16 +394,23 @@ local function stop()
     end)
 
     -- Print the player scores
+    local airtable = {}
     for i, score in ipairs(scores) do
         local money = score[1]
         local player_name = score[2]
         local place = Nth(i)
+
+        local index = i*2
+        airtable[index-1] = score[2]
+        airtable[index] = math.round(money,2)
+
         local colour = colors[place] or colors.default
         game.print(message_format:format(place, player_name, money), colour)
     end
 
     -- Reset the global values
     reset_globals()
+    return Mini_games.format_airtable(airtable)
 end
 
 --- Triggered when an entity is placed
@@ -791,7 +798,7 @@ end
 
 --- Register the mini game to the mini game module
 local tight = Mini_games.new_game("Tight_spot")
-tight:add_map("nauvis", 0, 0)
+tight:add_map("tight_spot_lv:1", 0, 0)
 tight:set_start_function(start)
 tight:set_stop_function(stop)
 tight:add_option(2)
