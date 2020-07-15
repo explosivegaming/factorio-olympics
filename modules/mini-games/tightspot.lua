@@ -331,6 +331,7 @@ end
 
 --- When a player leaves hide the main gui
 local function on_player_left(event)
+    game.print(Mini_games.get_current_state())
     local player = game.players[event.player_index]
 
     local Main_gui = Gui.get_left_element(player, game_gui)
@@ -377,7 +378,7 @@ local function stop()
         scores[#scores + 1] = {Store.get(balances, name), name}
     end
 
-    scores = table.sort(scores, function(a, b)
+    table.sort(scores, function(a, b)
         return a[1] > b[1]
     end)
 
@@ -590,6 +591,7 @@ end
 
 --- Update and check the timer, called once per second
 local function timer()
+    if not variables.tick then return end
     local time
 
     -- Find the correct time and check if its 0
@@ -635,7 +637,7 @@ Gui.element {
     value_step = 1
 }
 :on_value_changed(function(_, element, _)
-    if Mini_games.get_running_game() == "Tight_spot" then
+    if Mini_games.get_current_game() == "Tight_spot" then
         local name, value = element.name, element.slider_value
         if value == game.speed then return end
         game.speed = value
@@ -721,8 +723,8 @@ end)
 :add_to_left_flow(false)
 
 --- Add a toolbar button to toggle the main gui
-Gui.left_toolbar_button("item/coin", "money", game_gui, function(_)
-    return Mini_games.get_running_game() == "Tight_spot"
+Gui.left_toolbar_button("item/coin", "money", game_gui, function(player)
+    return Mini_games.player_is_participant(player) and Mini_games.get_running_game() == "Tight_spot"
 end)
 
 --- Drop down used to select a level
@@ -778,10 +780,10 @@ tight:add_event(defines.events.on_market_item_purchased, on_market_used)
 tight:add_event(defines.events.on_player_mined_entity, on_entity_mined)
 tight:add_event(defines.events.on_player_changed_position, on_player_moved)
 
-tight:add_event(Mini_games.event.on_participant_added, on_player_added)
-tight:add_event(Mini_games.event.on_participant_joined, on_player_joined)
-tight:add_event(Mini_games.event.on_participant_left, on_player_left)
-tight:add_event(Mini_games.event.on_participant_removed, on_player_removed)
+tight:add_event(Mini_games.events.on_participant_added, on_player_added)
+tight:add_event(Mini_games.events.on_participant_joined, on_player_joined)
+tight:add_event(Mini_games.events.on_participant_left, on_player_left)
+tight:add_event(Mini_games.events.on_participant_removed, on_player_removed)
 
-tight:on_nth_tick(100, check_chest)
-tight:on_nth_tick(60, timer)
+tight:add_nth_tick(100, check_chest)
+tight:add_nth_tick(60, timer)

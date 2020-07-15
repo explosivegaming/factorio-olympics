@@ -162,6 +162,8 @@ local function on_init(args)
     -- Setup the gate areas
     setup_areas()
 
+    --[[ -- todo move this out of on_init, need better way to assign new participants
+
     -- Check which players are already selected
     local done, ctn = {}, 0
     for _, player in pairs(Mini_games.get_participants()) do
@@ -187,6 +189,8 @@ local function on_init(args)
             ctn = ctn + 1
         end
     end
+
+    ]]
 end
 
 --- When a player is added create a car for them
@@ -221,7 +225,10 @@ end
 --- When a player joins place them into their car
 local function on_player_joined(event)
     local player = game.players[event.player_index]
-    cars[player.name].set_driver(player)
+    local car = cars[player.name]
+    player.create_character()
+    player.teleport(car.position, car.surface)
+    car.set_driver(player)
 end
 
 --- Function called by mini game module to start a race
@@ -387,9 +394,8 @@ local function player_move(event)
             if laps[name] >= variables["laps"] then
                 cars[name].destroy()
                 cars[name] = nil
-                if player.character then
-                    player.character.destroy()
-                end
+                if player.character then player.character.destroy() end
+                player.set_controller{ type = defines.controllers.god }
 
                 -- Print and update finish times
                 game.print(finish_format:format(name, scores[name].total_time, Nth(variables["place"])))
@@ -563,13 +569,14 @@ end
 local race = Mini_games.new_game("Race_game")
 race:set_core_events(on_init, start, stop, on_close)
 race:set_gui(main_gui, gui_callback)
+race:add_surface('Race game')
 race:add_option(3) -- how many options are needed with /start
 
 race:add_event(defines.events.on_player_changed_position, player_move)
 race:add_event(defines.events.on_entity_died, car_destroyed)
 race:add_event(defines.events.on_player_driving_changed_state, back_in_car)
 
-race:add_event(Mini_games.event.on_participant_added, on_player_added)
-race:add_event(Mini_games.event.on_participant_joined, on_player_joined)
-race:add_event(Mini_games.event.on_participant_left, on_player_left)
-race:add_event(Mini_games.event.on_participant_removed, on_player_removed)
+race:add_event(Mini_games.events.on_participant_added, on_player_added)
+race:add_event(Mini_games.events.on_participant_joined, on_player_joined)
+race:add_event(Mini_games.events.on_participant_left, on_player_left)
+race:add_event(Mini_games.events.on_participant_removed, on_player_removed)

@@ -151,7 +151,9 @@ end)
 --- Button on the top flow used to toggle the player list container
 -- @element toggle_left_element
 Gui.left_toolbar_button('entity/character', {'player-list.main-tooltip'}, player_list_container, function(player)
-    return not Roles.player_has_role(player, 'Participant') and Mini_games.get_current_state() == 'Started'
+    local allowed = not Mini_games.player_is_participant(player) and Mini_games.get_running_game() ~= nil
+    if player.online_time > 1 then Gui.toggle_left_element(player, player_list_container, allowed) end
+    return allowed
 end)
 
 -- Get caption and tooltip format for a player
@@ -186,7 +188,7 @@ end
 local function get_player_list_order()
     -- Sort all the online players into roles
     local players = {}
-    for _, player in pairs(game.connected_players) do
+    for _, player in pairs(Mini_games.get_participants()) do
         local highest_role = Roles.get_player_highest_role(player)
         if not players[highest_role.name] then
             players[highest_role.name] = {}
@@ -217,7 +219,7 @@ local function get_player_list_order()
         end
     end
 
-    --Adds fake players to the player list
+    --[[Adds fake players to the player list
     local tick = game.tick
     for i = 1, 10 do
         local online_time = math.random(1, tick)
@@ -233,7 +235,7 @@ local function get_player_list_order()
             caption = caption,
             tooltip = tooltip
         }
-    end
+    end]]
 
     return player_list_order
 end
@@ -267,12 +269,22 @@ local function redraw_player_list()
         local frame = Gui.get_left_element(player, player_list_container)
         local container = frame.container
 
-        for name, force in pairs(game.forces) do
+        local forces = {}
+        for _, next_player_data in ipairs(player_list_order) do
+            forces[next_player_data.force] = true
+            add_player_base(container[next_player_data.force].table, next_player_data)
+        end
+
+        for name in pairs(game.forces) do
             local scroll_table = container[name]
             local header = container[name..'-header']
+            if not scroll_table then
+                scroll_table = section(container, name, 2).parent
+                header = container[name..'-header']
+            end
             scroll_table.table.clear()
 
-            if #force.connected_players == 0 then
+            if not forces[name] then
                 scroll_table.visible = false
                 header.visible = false
             else
@@ -280,12 +292,10 @@ local function redraw_player_list()
             end
         end
 
-        for _, next_player_data in ipairs(player_list_order) do
-            add_player_base(container[next_player_data.force].table, next_player_data)
-        end
     end
 end
 
+Event.add(defines.events.on_player_changed_force, redraw_player_list)
 Event.add(defines.events.on_player_joined_game, redraw_player_list)
 Event.add(Roles.events.on_role_assigned, redraw_player_list)
 Event.add(Roles.events.on_role_unassigned, redraw_player_list)
