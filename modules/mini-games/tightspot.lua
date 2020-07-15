@@ -12,7 +12,6 @@ local save = {tiles = {}, entities = {}}
 local game_gui
 local variables = {}
 local centers = {}
-local markets = {}
 local entities = {}
 local started = {}
 local chests = {}
@@ -72,7 +71,6 @@ end)
 --- Register all the global variables
 Global.register({
     centers      = centers,
-    markets      = markets,
     entities     = entities,
     started      = started,
     chests       = chests,
@@ -83,7 +81,6 @@ Global.register({
     left_players = left_players
 },function(tbl)
     centers      = tbl.centers
-    markets      = tbl.markets
     entities     = tbl.entities
     started      = tbl.started
     chests       = tbl.chests
@@ -93,6 +90,8 @@ Global.register({
     save         = tbl.save
     left_players = tbl.left_players
 end)
+
+----- Local Functions -----
 
 --- Internal, Used to clear tables of all values
 local function reset_table(table)
@@ -104,7 +103,6 @@ end
 --- Internal, Reset all global tables
 local function reset_globals()
     reset_table(centers)
-    reset_table(markets)
     reset_table(entities)
     reset_table(started)
     reset_table(chests)
@@ -172,6 +170,8 @@ local function change_balance(player, amount)
     Store.set(balances, player, player.get_item_count("coin"))
 end
 
+----- Game Setup -----
+
 --- Save the starting island so it can be cloned for new players
 local function level_save()
     -- Save all the tiles from the template
@@ -205,42 +205,45 @@ local function level_save()
     end
 end
 
---- Clones the template island and teleports the player to it
-local function setup_player_island(player, at_player)
-    -- Put the player into god mod
-    local character = player.character
-    player.set_controller{ type = defines.controllers.god }
-    player.force.manual_mining_speed_modifier = 1000
-    if character and character.valid then
-        character.destroy()
+--- Called before the game starts and before any players are added
+local function on_init(args)
+    variables["level"] = {}
+    variables["surface"] = {}
+    variables["walls"] = {}
+
+    -- Setup all level related variables
+    local level_index = tonumber(args[1])
+    variables.level = config[level_index]
+    variables.difficulty = variables.level.money[args[2]]
+    variables.loan_price = variables.level.loan_prices[args[2]]
+    variables["surface"] = game.surfaces[variables.level["surface"]]
+
+    -- Save the island template
+    if not save["tiles"][1] then level_save() end
+
+    -- Set up the allowed items for the force
+    local force = game.forces.player
+    force.disable_all_prototypes()
+    force.manual_mining_speed_modifier = 1000
+    local recipe_list = force.recipes
+    for index, item in pairs(variables.level.recipes) do
+        recipe_list[item].enabled = true
     end
+end
 
-    -- Give the player the starting amount of coins
-    local level = variables.level
-    Store.set(balances, player, variables.difficulty)
-    player.insert{ name = "coin", count = variables.difficulty }
-
-    -- Show the main gui for the game
-    local Main_gui = Gui.get_left_element(player, game_gui)
-    Gui.toggle_left_element(player, game_gui, true)
-
-    -- Set up the captions on the first gui table
-    local gui_table_one = Main_gui.container["Money"].table
-    gui_table_one["Balance"].caption = variables.difficulty
-    gui_table_one["Time"].caption = SecondsToClock(level.time / 60)
-
-    -- Set up the captions on the second gui table
-    local gui_table_two = Main_gui.container["Objectives"].table
-    gui_table_two["objective"].caption = level.objective
-    gui_table_two["prices"].caption = level.demand.price
+--- When a player is added create their island
+local function on_player_added(event)
+    local player = game.players[event.player_index]
+    local level  = variables.level
 
     -- Find the area for the players island
-    local player_offset = at_player * 500
+    local player_offset = (player.index-1) * 500
     local level_area = level.area
     local area = {
         {level_area[1][1] + player_offset, level_area[1][2]},
         {level_area[2][1] + player_offset, level_area[2][2]}
     }
+
     islands[player.name] = area
     clean_up(area)
 
@@ -250,8 +253,8 @@ local function setup_player_island(player, at_player)
         tiles[i] = {
             name = tile.name,
             position = {
-              x = tile.position.x + player_offset,
-              y = tile.position.y
+                x = tile.position.x + player_offset,
+                y = tile.position.y
             }
         }
     end
@@ -265,7 +268,9 @@ local function setup_player_island(player, at_player)
         local minable = entity[4]
         local ent = variables["surface"].create_entity{ name = name, position = position, force = force }
         if name == "market" then
-            markets[#markets + 1] = position
+            for _, item in ipairs(variables.level.items) do
+                ent.add_market_item{price = {{"coin", tightspot_prices[item]}}, offer = {type = "give-item", item = item}}
+            end
         elseif name == "steel-chest" then
             chests[#chests + 1] = {ent, player.name}
         end
@@ -287,47 +292,56 @@ local function setup_player_island(player, at_player)
         wall_data[p.x .. "," .. p.y] = true
     end
 
-    -- Teleport the player to their island
-    player.teleport(centers[player.name], level.surface)
 end
 
---- Called by mine game module to start this minigame
-local function start(args)
-    variables["level"] = {}
-    variables["surface"] = {}
-    variables["walls"] = {}
+--- When a player joins the game teleport them to they island and update they gui
+local function on_player_joined(event)
+    local level  = variables.level
+    local player = game.players[event.player_index]
+    local center = centers[player.name]
+    player.teleport(center, variables.level.surface)
 
-    -- Setup all level related variables
-    local level_index = tonumber(args[1])
-    variables.level = config[level_index]
-    variables.difficulty = variables.level.money[args[2]]
-    variables.loan_price = variables.level.loan_prices[args[2]]
-    variables["surface"] = game.surfaces[variables.level["surface"]]
+    -- Show the main gui for the game
+    local Main_gui = Gui.get_left_element(player, game_gui)
+    Gui.toggle_left_element(player, game_gui, true)
 
-    -- Save the template and clone it for all existing players
-    if not save["tiles"][1] then level_save() end
-    for i, player in ipairs(game.connected_players) do
-        setup_player_island(player, i - 1)
+    -- Update the captions in the first gui table
+    local gui_table_one = Main_gui.container["Money"].table
+    gui_table_one["Balance"].caption = variables.difficulty
+    gui_table_one["Time"].caption = SecondsToClock(level.time / 60)
+
+    -- Update the captions in the second gui table
+    local gui_table_two = Main_gui.container["Objectives"].table
+    gui_table_two["objective"].caption = level.objective
+    gui_table_two["prices"].caption = level.demand.price
+end
+
+--- Called when the game is ready to start
+local function start()
+    -- Give all players there starting money
+    for _, player in ipairs(Mini_games.get_participants()) do
+        Store.set(balances, player, variables.difficulty)
+        player.insert{ name = "coin", count = variables.difficulty }
     end
 
-    -- Set up the allowed items for the force
-    local force = game.players[1].force
-    force.disable_all_prototypes()
-    local recipe_list = force.recipes
-    for index, item in pairs(variables.level.recipes) do
-        recipe_list[item].enabled = true
-    end
-
-    -- Set up the markets
-    for i, pos in ipairs(markets) do
-        local market = variables["surface"].find_entity("market", pos)
-        market.clear_market_items()
-        for _, item in ipairs(variables.level.items) do
-            market.add_market_item{price = {{"coin", tightspot_prices[item]}}, offer = {type = "give-item", item = item}}
-        end
-    end
     variables.tick = game.tick
 end
+
+----- Game Cleanup -----
+
+--- When a player leaves hide the main gui
+local function on_player_left(event)
+    local player = game.players[event.player_index]
+
+    local Main_gui = Gui.get_left_element(player, game_gui)
+    Gui.toggle_left_element(player, game_gui, false)
+
+    local table = Main_gui.container["slider"].table
+    table.visible = false
+end
+
+--- When a player is removed hide the gui
+local on_player_removed = on_player_left
 
 --- Get the english suffix that follows a position number
 --@author https://rosettacode.org/wiki/N%27th#Lua
@@ -357,39 +371,13 @@ local function stop()
     game.speed = 1
     started[1] = false
 
-    -- Reset all players and their guis
-    for i, player in ipairs(game.connected_players) do
-        player.set_controller{ type = defines.controllers.god }
-        player.create_character()
-
-        local Main_gui = Gui.get_left_element(player, game_gui)
-        Gui.toggle_left_element(player, game_gui, false)
-
-        local table = Main_gui.container["slider"].table
-        table.visible = false
-    end
-
-    -- Remove all placed entities
-    local area = variables.level.area
-    clean_up(area)
-
-    -- Remake all entities from the template
-    for i, entity in ipairs(save.entities) do
-        local name = entity[1]
-        local position = entity[2]
-        local force = entity[3]
-        local minable = entity[4]
-        local ent = variables["surface"].create_entity {name = name, position = position, force = force}
-        ent.minable = minable
-    end
-
     -- Get all player scores and sort them in order
     local scores = {}
     for name in pairs(centers) do
         scores[#scores + 1] = {Store.get(balances, name), name}
     end
 
-    table.sort(scores, function(a, b)
+    scores = table.sort(scores, function(a, b)
         return a[1] > b[1]
     end)
 
@@ -408,13 +396,33 @@ local function stop()
         game.print(message_format:format(place, player_name, money), colour)
     end
 
-    -- Reset the global values
-    reset_globals()
     return Mini_games.format_airtable(airtable)
 end
 
+--- The last function to be called, used to clean up variables
+local function on_close()
+    -- Remove all placed entities
+    local area = variables.level.area
+    clean_up(area)
+
+    -- Remake all entities from the template
+    for i, entity in ipairs(save.entities) do
+        local name = entity[1]
+        local position = entity[2]
+        local force = entity[3]
+        local minable = entity[4]
+        local ent = variables["surface"].create_entity {name = name, position = position, force = force}
+        ent.minable = minable
+    end
+
+    -- Reset the global values
+    reset_globals()
+end
+
+----- Events -----
+
 --- Triggered when an entity is placed
-local function placed_entity(event)
+local function on_entity_placed(event)
     local entity = event.created_entity
     local position = entity.position
     local player = game.players[event.player_index]
@@ -448,7 +456,7 @@ local replace_wall = Token.register(function(args)
 end)
 
 --- Triggered when an entity is mined
-local function mined(event)
+local function on_entity_mined(event)
     local entity = event.entity
     if entity.type ~= "wall" then return end
     local position = entity.position
@@ -472,6 +480,44 @@ local function mined(event)
         }
     end
 end
+
+--- Triggered when the player uses the market
+local function on_market_used(event)
+    local player = game.players[event.player_index]
+    Store.set(balances, player, player.get_item_count("coin"))
+end
+
+--- AABB logic for if a position is in a box
+local function insideBox(box, pos)
+    local x1 = box[1][1]
+    local y1 = box[1][2]
+    local x2 = box[2][1]
+    local y2 = box[2][2]
+
+    local px = pos.x
+    local py = pos.y
+    return px >= x1 and px <= x2 and py >= y1 and py <= y2
+end
+
+--- Triggered when the player moves
+local function on_player_moved(event)
+    -- Check the player is still on the game surface
+    local player = game.players[event.player_index]
+    if player.surface.name ~= variables.level.surface then return end
+
+    -- Check if the player is a contestant
+    local center = centers[player.name]
+    if not center then return end
+
+    -- If the player leaves their island teleport them back
+    local pos = player.position
+    local area = islands[player.name]
+    if not insideBox(area, pos) then
+        player.teleport(center, variables.level.surface)
+    end
+end
+
+----- Nth Tick Events -----
 
 --- When the timer runs out make all entities active
 local function start_production()
@@ -518,7 +564,7 @@ local function start_production()
 
 end
 
---- Check the contents of all chests to check for produced items
+--- Check the contents of all chests to check for produced items, called once per 100 ticks
 local function check_chest()
     if not started[1] then return end
     for i, chest in ipairs(chests) do
@@ -542,7 +588,7 @@ local function check_chest()
     end
 end
 
---- Update and check the timer
+--- Update and check the timer, called once per second
 local function timer()
     local time
 
@@ -569,80 +615,7 @@ local function timer()
     end
 end
 
---- Triggered when the player uses the market
-local function market(event)
-    local player = game.players[event.player_index]
-    Store.set(balances, player, player.get_item_count("coin"))
-end
-
---- AABB logic for if a position is in a box
-local function insideBox(box, pos)
-    local x1 = box[1][1]
-    local y1 = box[1][2]
-    local x2 = box[2][1]
-    local y2 = box[2][2]
-
-    local px = pos.x
-    local py = pos.y
-    return px >= x1 and px <= x2 and py >= y1 and py <= y2
-end
-
---- Triggered when the player moves
-local function player_move(event)
-    -- Check the player is still on the game surface
-    local player = game.players[event.player_index]
-    if player.surface.name ~= variables.level.surface then return end
-
-    -- Check if the player is a contestant
-    local center = centers[player.name]
-    if not center then return end
-
-    -- If the player leaves their island teleport them back
-    local pos = player.position
-    local area = islands[player.name]
-    if not insideBox(area, pos) then
-        player.teleport(center, variables.level.surface)
-    end
-end
-
---- Triggered when a player leaves the game
-local function on_player_left_game(event)
-    local player = game.players[event.player_index]
-    local inv = player.get_inventory(defines.inventory.god_main)
-    local all_items = inv.get_contents()
-    left_players[player.name] = all_items
-
-    -- Teleport the player to nauvis
-    player.set_controller {type = defines.controllers.god}
-    player.create_character()
-    player.teleport({-35, 55}, "nauvis")
-
-    -- Hide the game gui
-    local Main_gui = Gui.get_left_element(player, game_gui)
-    Gui.toggle_left_element(player, game_gui, false)
-
-    local table = Main_gui.container["slider"].table
-    table.visible = false
-end
-
---- Triggered when a player joins the game
-local function player_join(event)
-    local player = game.players[event.player_index]
-    player.character.destroy()
-    local items = left_players[player.name]
-    local center = centers[player.name]
-    if items and not started[1] then
-        player.teleport(center, variables.level.surface)
-        player.set_controller {type = defines.controllers.god}
-        Gui.toggle_left_element(player, game_gui, true)
-        for item, amount in pairs(items) do
-            player.insert {name = item, count = amount}
-        end
-    else
-        player.set_controller{ type = defines.controllers.spectator }
-        player.teleport(variables.level.center, variables.level.surface)
-    end
-end
+----- Gui and Stores -----
 
 --- When the players balance changes update the gui
 Store.watch(balances, function(value, key, _)
@@ -775,21 +748,19 @@ local dropdown_for_difficulty =
 --- The gui used to start the game
 local main_gui =
 Gui.element(function(_, parent)
-    local main_flow = parent.add {type = "flow", name = "Tight_flow"}
-    dropdown_for_level(main_flow)
-    dropdown_for_difficulty(main_flow)
+    dropdown_for_level(parent)
+    dropdown_for_difficulty(parent)
 end)
 
 --- Used to read data from the start gui
 local function gui_callback(parent)
-    local flow = parent["Tight_flow"]
     local args = {}
 
-    local level_dropdown = flow[dropdown_for_level.name]
+    local level_dropdown = parent[dropdown_for_level.name]
     local level_config = level_dropdown.selected_index
     args[1] = level_config
 
-    local difficulty_dropdown = flow[dropdown_for_difficulty.name]
+    local difficulty_dropdown = parent[dropdown_for_difficulty.name]
     local difficulty_set = difficulty_dropdown.get_item(difficulty_dropdown.selected_index)
     args[2] = difficulty_set
 
@@ -798,19 +769,19 @@ end
 
 --- Register the mini game to the mini game module
 local tight = Mini_games.new_game("Tight_spot")
-tight:add_map("tight_spot_lv:1", 0, 0)
-tight:set_start_function(start)
-tight:set_stop_function(stop)
+tight:set_core_events(on_init, start, stop, on_close)
+tight:set_gui(main_gui, gui_callback)
 tight:add_option(2)
 
-tight:add_event(defines.events.on_built_entity, placed_entity)
-tight:add_event(defines.events.on_market_item_purchased, market)
-tight:add_event(defines.events.on_player_mined_entity, mined)
-tight:add_event(defines.events.on_player_changed_position, player_move)
-tight:add_event(defines.events.on_pre_player_left_game, on_player_left_game)
-tight:add_event(defines.events.on_player_joined_game, player_join)
+tight:add_event(defines.events.on_built_entity, on_entity_placed)
+tight:add_event(defines.events.on_market_item_purchased, on_market_used)
+tight:add_event(defines.events.on_player_mined_entity, on_entity_mined)
+tight:add_event(defines.events.on_player_changed_position, on_player_moved)
+
+tight:add_event(Mini_games.event.on_participant_added, on_player_added)
+tight:add_event(Mini_games.event.on_participant_joined, on_player_joined)
+tight:add_event(Mini_games.event.on_participant_left, on_player_left)
+tight:add_event(Mini_games.event.on_participant_removed, on_player_removed)
+
 tight:on_nth_tick(100, check_chest)
 tight:on_nth_tick(60, timer)
-
-tight:set_gui_callback(gui_callback)
-tight:set_gui_element(main_gui)
