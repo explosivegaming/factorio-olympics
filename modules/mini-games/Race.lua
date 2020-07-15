@@ -1,4 +1,4 @@
-local Mini_games = require "expcore.Mini_games"
+local Mini_games        = require "expcore.Mini_games"
 local Token             = require "utils.token"
 local task              = require "utils.task"
 local Permission_Groups = require "expcore.permission_groups"
@@ -16,7 +16,6 @@ local variables = {}
 local scores = {}
 local laps = {}
 local gate_boxes = {}
-local start_players ={}
 
 --- Register a new permission group for players not in cars
 Permission_Groups.new_group('out_car')
@@ -41,7 +40,6 @@ Global.register({
     scores          = scores,
     laps            = laps,
     gate_boxes      = gate_boxes,
-    start_players   = start_players
 },function(tbl)
     surface         = tbl.surface
     gates           = tbl.gates
@@ -53,11 +51,12 @@ Global.register({
     scores          = tbl.scores
     laps            = tbl.laps
     gate_boxes      = tbl.gate_boxes
-    start_players   = tbl.start_players
     for k, v in pairs(tbl) do
         debug_interface[k] = v
     end
 end)
+
+----- Local Functions -----
 
 --- Internal, Used to clear tables of all values
 local function reset_table(table)
@@ -75,8 +74,9 @@ local function reset_globals()
     reset_table(dead_cars)
     reset_table(scores)
     reset_table(laps)
-    reset_table(start_players)
 end
+
+----- Game Setup -----
 
 --- Used to print the countdown and to fuel the cars when at 0
 local race_count_down
@@ -87,21 +87,21 @@ race_count_down = Token.register(function()
         task.set_timeout_in_ticks(60, race_count_down)
     else
         game.print("0 --> GO!", { 0, 1, 0 })
-        for _, player_name in pairs(start_players) do
-            local car = cars[player_name]
+        for _, player in ipairs(Mini_games.get_participants()) do
+            local car = cars[player.name]
             car.get_fuel_inventory().insert{name = variables["fuel"], count = 100}
-            scores[player_name].time = game.tick
+            scores[player.name].time = game.tick
         end
     end
 end)
 
---- Pick a random player who is not in start_players
-local function pick_player()
+--- Pick a random player who is not in the black list
+local function pick_player(black_list)
     local player = game.connected_players[math.random(#game.connected_players)]
-    if not start_players[player.name] then
+    if not black_list[player.name] then
         return player
     else
-        return pick_player()
+        return pick_player(black_list)
     end
 end
 
@@ -135,8 +135,8 @@ local function setup_areas()
     end
 end
 
---- Function called by mini game module to start a race
-local function start(args)
+--- Called before the game starts and before any players are added
+local function on_init(args)
     surface[1] = game.surfaces["Race game"]
     variables["done_left"]  = 0
     variables["count_down"] = 4
@@ -146,7 +146,6 @@ local function start(args)
     variables["laps"]       = tonumber(args[2])
     variables["player"]     = tonumber(args[3])
     variables["place"]      = 1
-    variables["new_joins"]  = 0
     scores["finish_times"]  = {}
 
     -- Error if no lap count was given
@@ -160,67 +159,103 @@ local function start(args)
         return Mini_games.error_in_game("No fuel with that name")
     end
 
-    -- Check if all players should be selected
-    local pick_all = false
+    -- Setup the gate areas
+    setup_areas()
+
+    -- Check which players are already selected
+    local done, ctn = {}, 0
+    for _, player in pairs(Mini_games.get_participants()) do
+        done[player.name] = true
+        ctn = ctn + 1
+    end
+
+    -- Check if more was asked than are online
     if variables["player"] >= #game.connected_players then
-        variables["player"] =  #game.connected_players
-        pick_all = true
-    end
-
-    -- Loop over as many players that are required
-    for i = 1, variables["player"] do
-        local player
-        if pick_all then
-            player = game.connected_players[i]
-        else
-            player = pick_player()
+        -- All connected players are added as participants
+        variables["player"] = #game.connected_players
+        for _, player in ipairs(game.connected_players) do
+            if not done[player.name] then
+                Mini_games.add_participant(player)
+            end
         end
-
-        local name = player.name
-        start_players[name] = name
-
-        local pos
-        if variables["left"] then
-            pos = {-85, -126 + variables["done_left"] * 5}
-            variables["done_left"] = variables["done_left"] + 1
-            variables["left"] = false
-        else
-            pos = {-75, -126 + variables["done_right"] * 5}
-            variables["done_right"] = variables["done_right"] + 1
-            variables["left"] = true
-        end
-
-        local car = surface[1].create_entity{
-            name = "car",
-            position = pos,
-            force = "player",
-            direction = defines.direction.north
-        }
-
-        cars[name] = car
-        scores[name] = {}
-        car.operable = false
-        car.set_driver(player)
-        player_progress[name] = 1
-
-    end
-
-    -- Put all non racing players into spectator
-    for i, player in ipairs(game.connected_players) do
-        if not start_players[player.name] then
-            player.character.destroy()
-            variables["new_joins"] = variables["new_joins"] + 1
+    else
+        -- Not all players were selected, will in gaps if necessary
+        while ctn < variables["player"] do
+            local player = pick_player(done)
+            Mini_games.add_participant(player)
+            done[player.name] = true
+            ctn = ctn + 1
         end
     end
+end
 
-    -- Start the race
+--- When a player is added create a car for them
+local function on_player_added(event)
+    local player = game.players[event.player_index]
+    local name = player.name
+
+    local pos
+    if variables["left"] then
+        pos = {-85, -126 + variables["done_left"] * 5}
+        variables["done_left"] = variables["done_left"] + 1
+        variables["left"] = false
+    else
+        pos = {-75, -126 + variables["done_right"] * 5}
+        variables["done_right"] = variables["done_right"] + 1
+        variables["left"] = true
+    end
+
+    local car = surface[1].create_entity{
+        name = "car",
+        position = pos,
+        force = "player",
+        direction = defines.direction.north
+    }
+
+    cars[name] = car
+    scores[name] = {}
+    car.operable = false
+    player_progress[name] = 1
+end
+
+--- When a player joins place them into their car
+local function on_player_joined(event)
+    local player = game.players[event.player_index]
+    cars[player.name].set_driver(player)
+end
+
+--- Function called by mini game module to start a race
+local function start()
     local colour = { 57, 255, 20 }
     game.print("Race started!", colour)
     game.print("Racing in a car with "..variables["fuel"], colour)
     game.print("Laps: "..variables["laps"], colour)
     task.set_timeout_in_ticks(10, race_count_down)
-    setup_areas()
+end
 
+----- Game Cleanup -----
+
+--- When a player leaves they will no longer be able to rejoin the race
+local function on_player_left(event)
+    local player = game.players[event.player_index]
+    Mini_games.remove_participant(player)
+end
+
+---- When a player is removed, destroy the car and clear any data connected to them
+local function on_player_removed(event)
+    local player = game.players[event.player_index]
+
+    -- Clear any stored data
+    local name = player.name
+    scores[name] = nil
+    player_progress[name] = nil
+    player.character.destructible = true
+
+    -- Destroy their car
+    if cars[player.name] then
+        cars[player.name].destroy()
+        cars[player.name] = nil
+    end
 end
 
 --- Get the english suffix that follows a position number
@@ -248,18 +283,6 @@ local colors =  {
 
 --- Function called by mini game module to stop a race
 local function stop()
-    -- Remove all cars that were created
-    for i, car in pairs(cars) do
-        car.destroy()
-    end
-
-    -- Give all players a character if it was removed
-    for i, player in ipairs(game.connected_players) do
-        if not player.character then
-            player.create_character()
-        end
-    end
-
     -- Print the place that each player came
     local airtable = {}
     for name, value in pairs(scores["finish_times"]) do
@@ -273,10 +296,14 @@ local function stop()
         end
         game.print(message_format:format(place, name, time), colour)
     end
-    reset_globals()
 
     return Mini_games.format_airtable(airtable)
 end
+
+--- The last function to be called in order to clean up variables
+local on_close = reset_globals
+
+----- Events -----
 
 --- AABB logic for if a position is in a box
 local function insideBox(box, pos)
@@ -295,7 +322,7 @@ local lap_format = '%s has completed a lap in %.4f seconds. Lap %d out of %d.'
 local finish_format = '%s has completed all laps in %.4f seconds placing them %s.'
 local function player_move(event)
     local player = game.players[event.player_index]
-    if not start_players[player.name] then return end
+    if not cars[player.name] then return end
 
     -- Increase progress by one and open gates
     local name = player.name
@@ -370,7 +397,7 @@ local function player_move(event)
                 variables["place"] = variables["place"] + 1
 
                 -- If all players have finished then end the game
-                if variables["place"] > #game.connected_players - variables["new_joins"] then
+                if variables["place"] > #Mini_games.get_participants() then
                     Mini_games.stop_game()
                 end
             end
@@ -471,41 +498,7 @@ local function back_in_car(event)
     end
 end
 
---- Triggered when a player joins the game, used to move the player to spectator
-local function player_join(event)
-    local player = game.players[event.player_index]
-    player.teleport({-85, -126},"Race game")
-    player.character.destroy()
-    variables["new_joins"] = variables["new_joins"] + 1
-end
-
---- Triggered when a player leaves the game, clears player data and moves them to nauvis
-local function on_player_left_game(event)
-    local player = game.players[event.player_index]
-
-    -- Clear any stored data
-    if not start_players[player.name] then
-        variables["new_joins"] = variables["new_joins"] - 1
-    else
-        local name = player.name
-        start_players[name] = nil
-        scores[name] = nil
-        player_progress[name] = nil
-        player.character.destructible = true
-    end
-
-    -- Remake their character and teleport them
-    if not player.character then
-        player.create_character()
-    end
-    player.teleport({-35,55}, "nauvis")
-
-    -- Destroy their car
-    if cars[player.name] then
-        cars[player.name].destroy()
-    end
-
-end
+----- Gui Elements -----
 
 --- Used to select what type of fuel to use
 -- @element fuel_dropdown
@@ -544,25 +537,23 @@ Gui.element{
 -- @element main_gui
 local main_gui =
 Gui.element(function(_,parent)
-    local main_flow = parent.add{ type = 'flow', name = "Race_flow"}
-    fuel_dropdown(main_flow)
-    text_field_for_laps(main_flow)
-    text_field_for_players(main_flow)
+    fuel_dropdown(parent)
+    text_field_for_laps(parent)
+    text_field_for_players(parent)
 end)
 
 --- Used to read the data from the gui
 local function gui_callback(parent)
-    local flow = parent["Race_flow"]
     local args = {}
 
-    local dropdown = flow[fuel_dropdown.name]
+    local dropdown = parent[fuel_dropdown.name]
     local fuel = dropdown.get_item(dropdown.selected_index)
     args[1] = fuel
 
-    local required_laps = flow[text_field_for_laps.name].text
+    local required_laps = parent[text_field_for_laps.name].text
     args[2] = required_laps
 
-    local players = flow[text_field_for_players.name].text
+    local players = parent[text_field_for_players.name].text
     args[3] = players
 
     return args
@@ -570,16 +561,15 @@ end
 
 --- Register the mini game to the mini game module
 local race = Mini_games.new_game("Race_game")
-race:add_map("Race game", -80, -140)
-race:set_start_function(start)
-race:set_stop_function(stop)
+race:set_core_events(on_init, start, stop, on_close)
+race:set_gui(main_gui, gui_callback)
 race:add_option(3) -- how many options are needed with /start
 
 race:add_event(defines.events.on_player_changed_position, player_move)
 race:add_event(defines.events.on_entity_died, car_destroyed)
 race:add_event(defines.events.on_player_driving_changed_state, back_in_car)
-race:add_event(defines.events.on_player_joined_game, player_join)
-race:add_event(defines.events.on_pre_player_left_game, on_player_left_game)
 
-race:set_gui_element(main_gui)
-race:set_gui_callback(gui_callback)
+race:add_event(Mini_games.event.on_participant_added, on_player_added)
+race:add_event(Mini_games.event.on_participant_joined, on_player_joined)
+race:add_event(Mini_games.event.on_participant_left, on_player_left)
+race:add_event(Mini_games.event.on_participant_removed, on_player_removed)
