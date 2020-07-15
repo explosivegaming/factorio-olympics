@@ -291,6 +291,11 @@ function Public.init(args)
     total_calls = math.ceil(1024 / tiles_per_tick) + 5
 end
 
+--- Allows you to add more surfaces
+function Public.add_surface(surface_name, shape)
+    surfaces[surface_name] = shape
+end
+
 local do_chunk = Public.do_chunk
 local schedule_chunk = Public.schedule_chunk
 
