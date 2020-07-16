@@ -252,15 +252,20 @@ Event.on_nth_tick(1800, function()
     end
 end)
 
---- When a player leaves only remove they entry
-Event.add(defines.events.on_player_left_game, function(event)
-    local remove_player = Game.get_player_by_index(event.player_index)
-    for _, player in pairs(game.connected_players) do
-        local frame = Gui.get_left_element(player, player_list_container)
-        local scroll_table = frame.container.scroll.table
-        remove_player_base(scroll_table, remove_player)
+--- Remove a player from the list, even when they leave the game or are no longer a participant
+local function remove_player(event)
+    local player = game.players[event.player_index]
+    local force = player.force.name
+    for _, next_player in pairs(game.connected_players) do
+        local frame = Gui.get_left_element(next_player, player_list_container)
+        local scroll_table = frame.container[force]
+        if scroll_table then remove_player_base(scroll_table.table, player) end
     end
-end)
+end
+
+--- When a player leaves only remove they entry
+Event.add(defines.events.on_player_left_game, remove_player)
+Event.add(Mini_games.events.on_participant_removed, remove_player)
 
 --- All other events require a full redraw of the table
 local function redraw_player_list()
@@ -297,5 +302,6 @@ end
 
 Event.add(defines.events.on_player_changed_force, redraw_player_list)
 Event.add(defines.events.on_player_joined_game, redraw_player_list)
+Event.add(Mini_games.events.on_participant_added, redraw_player_list)
 Event.add(Roles.events.on_role_assigned, redraw_player_list)
 Event.add(Roles.events.on_role_unassigned, redraw_player_list)
