@@ -82,7 +82,7 @@ end
 local race_count_down
 race_count_down = Token.register(function()
     variables["count_down"] = variables["count_down"] - 1
-    if variables["count_down"] ~= 0 then
+    if variables["count_down"] > 0 then
         game.print(variables["count_down"], { 1, 0, 0 })
         task.set_timeout_in_ticks(60, race_count_down)
     else
@@ -94,16 +94,6 @@ race_count_down = Token.register(function()
         end
     end
 end)
-
---- Pick a random player who is not in the black list
-local function pick_player(black_list)
-    local player = game.connected_players[math.random(#game.connected_players)]
-    if not black_list[player.name] then
-        return player
-    else
-        return pick_player(black_list)
-    end
-end
 
 --- Get all the script areas, and get the gates in those areas
 local function setup_areas()
@@ -144,7 +134,6 @@ local function on_init(args)
     variables["left"]       = true
     variables["fuel"]       = args[1]
     variables["laps"]       = tonumber(args[2])
-    variables["player"]     = tonumber(args[3])
     variables["place"]      = 1
     scores["finish_times"]  = {}
 
@@ -162,35 +151,8 @@ local function on_init(args)
     -- Setup the gate areas
     setup_areas()
 
-    --[[ -- todo move this out of on_init, need better way to assign new participants
-
-    -- Check which players are already selected
-    local done, ctn = {}, 0
-    for _, player in pairs(Mini_games.get_participants()) do
-        done[player.name] = true
-        ctn = ctn + 1
-    end
-
-    -- Check if more was asked than are online
-    if variables["player"] >= #game.connected_players then
-        -- All connected players are added as participants
-        variables["player"] = #game.connected_players
-        for _, player in ipairs(game.connected_players) do
-            if not done[player.name] then
-                Mini_games.add_participant(player)
-            end
-        end
-    else
-        -- Not all players were selected, will in gaps if necessary
-        while ctn < variables["player"] do
-            local player = pick_player(done)
-            Mini_games.add_participant(player)
-            done[player.name] = true
-            ctn = ctn + 1
-        end
-    end
-
-    ]]
+    -- Set the number of required participants
+    Mini_games.set_participant_requirement(tonumber(args[3]))
 end
 
 --- When a player is added create a car for them
@@ -256,7 +218,9 @@ local function on_player_removed(event)
     local name = player.name
     scores[name] = nil
     player_progress[name] = nil
-    player.character.destructible = true
+    if player.character then
+        player.character.destructible = true
+    end
 
     -- Destroy their car
     if cars[player.name] then
@@ -512,7 +476,8 @@ local fuel_dropdown =
 Gui.element{
     type = 'drop-down',
     items = {"nuclear-fuel","wood","coal","solid-fuel","rocket-fuel"},
-    selected_index = 1
+    selected_index = 1,
+    tooltip = 'Fuel'
 }
 
 --- Used to select the number of laps to complete
@@ -522,6 +487,7 @@ Gui.element{
     type = 'textfield',
     text = '1',
     numeric = true,
+    tooltip = 'Laps'
 }
 :style{
   width = 25
@@ -534,6 +500,7 @@ Gui.element{
     type = 'textfield',
     text = '1',
     numeric = true,
+    tooltip = 'Players'
 }
 :style{
   width = 25

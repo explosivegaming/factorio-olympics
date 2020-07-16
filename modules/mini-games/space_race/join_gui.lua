@@ -11,12 +11,12 @@ function Public.show_gui(event)
     local frame
     local player = game.get_player(event.player_index)
     local center = player.gui.center
-    local gui = center['Space-Race-Lobby']
+    local gui = center['Space-Race']
     if (gui) then
         Gui.destroy(gui)
     end
 
-    frame = player.gui.center.add {name = 'Space-Race-Lobby', type = 'frame', direction = 'vertical', style = 'captionless_frame'}
+    frame = player.gui.center.add {name = 'Space-Race', type = 'frame', direction = 'vertical', style = 'captionless_frame'}
 
     frame.style.minimal_width = 300
 

@@ -229,6 +229,9 @@ local function on_init(args)
     for index, item in pairs(variables.level.recipes) do
         recipe_list[item].enabled = true
     end
+
+    -- Set the number of required participants
+    Mini_games.set_participant_requirement(0)
 end
 
 --- When a player is added create their island
@@ -331,7 +334,6 @@ end
 
 --- When a player leaves hide the main gui
 local function on_player_left(event)
-    game.print(Mini_games.get_current_state())
     local player = game.players[event.player_index]
 
     local Main_gui = Gui.get_left_element(player, game_gui)
@@ -637,7 +639,7 @@ Gui.element {
     value_step = 1
 }
 :on_value_changed(function(_, element, _)
-    if Mini_games.get_current_game() == "Tight_spot" then
+    if Mini_games.get_running_game() == "Tight_spot" then
         local name, value = element.name, element.slider_value
         if value == game.speed then return end
         game.speed = value
@@ -729,20 +731,22 @@ end)
 
 --- Drop down used to select a level
 local dropdown_for_level =
-    Gui.element {
+Gui.element {
     type = "drop-down",
     items = {"level-1", "level-2"},
-    selected_index = 1
+    selected_index = 1,
+    tooltip = 'Level'
 }:style {
     width = 87
 }
 
 --- Drop down used to select a difficulty
 local dropdown_for_difficulty =
-    Gui.element {
+Gui.element {
     type = "drop-down",
     items = {"easy", "normal", "hard"},
-    selected_index = 1
+    selected_index = 1,
+    tooltip = 'Difficulty'
 }:style {
     width = 87
 }

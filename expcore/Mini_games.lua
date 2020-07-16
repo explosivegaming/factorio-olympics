@@ -8,6 +8,7 @@ local Gui = require 'expcore.gui'
 local Roles = require 'expcore.roles' --- @dep expcore.roles
 require 'config.expcore.command_runtime_disable' --required to load before running the script
 
+local WaitingGui = require 'modules.gui.mini_game_waiting'
 local LoadingGui = require 'modules.gui.mini_game_loading'
 local Mini_games = {
     _prototype = {},
@@ -127,8 +128,15 @@ function Mini_games._prototype:add_surface(surface_name, shape)
 end
 
 --- Add a callback to check if the mini game is ready to start, if not used game starts after init
-function Mini_games._prototype:set_ready_condition(callback)
+function Mini_games._prototype:set_ready_condition(callback, hide_load_gui)
     self.ready_condition = callback
+    self.hide_load_gui = hide_load_gui
+end
+
+--- Add a callback to check if a player should be added as a participant
+function Mini_games._prototype:set_participant_selector(callback, hide_wait_gui)
+    self.participant_selector = callback
+    self.hide_wait_gui = hide_wait_gui
 end
 
 --- Add a gui element to be used in the vote gui
@@ -156,7 +164,7 @@ end
 
 --- Get the currently game
 function Mini_games.get_current_game()
-    return primitives.current_game
+    return Mini_games.mini_games[primitives.current_game]
 end
 
 --- Get the currently running game
@@ -175,6 +183,11 @@ function Mini_games.get_start_time()
     return primitives.start_tick
 end
 
+--- Set the number of required participants, call during on_init to set the amount of required participants
+function Mini_games.set_participant_requirement(amount)
+    primitives.participant_requirement = amount
+end
+
 --- Get all the participants in a game
 function Mini_games.get_participants()
     return participants
@@ -189,6 +202,7 @@ function Mini_games.player_is_participant(player)
 end
 
 --- Add a participant to a game, only callable before on_start, will return false if game has started and the player is not an active participant
+local check_participant_count
 function Mini_games.add_participant(player)
     if Mini_games.player_is_participant(player) then return true end
     if primitives.state == 'Started' then return false end
@@ -196,6 +210,7 @@ function Mini_games.add_participant(player)
 
     participants[#participants+1] = player
     raise_event('on_participant_added', player)
+    check_participant_count()
     return true
 end
 
@@ -207,6 +222,7 @@ function Mini_games.remove_participant(player)
             participants[#participants] = nil
             raise_event('on_participant_removed', player)
             Mini_games.respawn_spectator(player)
+            check_participant_count()
             return
         end
     end
@@ -239,25 +255,62 @@ local function role_event(handler)
     end
 end
 
+--- Used to decide if the wait gui should be shown to a new player
+-- If there is no game, hide_wait_gui is true, or a game is started the gui is hidden
+local function check_wait_screen(player)
+    local mini_game = Mini_games.get_current_game()
+    local started = primitives.state == 'Started' or primitives.state == 'Starting'
+    if not mini_game or mini_game.hide_wait_gui or started then
+        WaitingGui.hide(player)
+    else
+        Mini_games.show_waiting_screen(player)
+    end
+end
+
+--- Used to either add a participant or pass the player to participant_selector
+-- If a participant selector exists then the player is passed to it
+local function check_participant_selector_join(player)
+    check_wait_screen(player)
+    local mini_game = Mini_games.get_current_game()
+    if mini_game and mini_game.participant_selector then
+        xpcall(mini_game.participant_selector, internal_error, player)
+    else
+        Mini_games.add_participant(player)
+    end
+end
+
+--- Used to either remove a participant or pass the player to participant_selector
+-- If a participant selector exists then the player is passed to it
+local function check_participant_selector_leave(player)
+    check_wait_screen(player)
+    Mini_games.remove_participant(player)
+    local mini_game = Mini_games.get_current_game()
+    if mini_game and mini_game.participant_selector then
+        xpcall(mini_game.participant_selector, internal_error, player, true)
+    end
+end
+
 --- Triggered when a player is assigned new roles, and the player has joined the server once before
 -- Non participants who gain the role before game start will be added to the participants list (must be online)
 -- Non participants who gain the role after game start will not be added to the participants list
-Event.add(Roles.events.on_role_assigned, role_event(Mini_games.add_participant))
+Event.add(Roles.events.on_role_assigned, role_event(check_participant_selector_join))
 
 --- Triggered when a player is unassigned from roles, and the player has joined the server once before
 -- Participants who lose the role will be removed from the participants list, if they are on it
-Event.add(Roles.events.on_role_unassigned, role_event(Mini_games.remove_participant))
+Event.add(Roles.events.on_role_unassigned, role_event(check_participant_selector_leave))
 
 --- Triggered when a player joins the game, will trigger on_participant_joined if there is a game running
 -- Active participants who join after game start will trigger on_participant_joined
--- Inactive participants (who join before start) will be added to the participants list
+-- Inactive participants (who join before start) will be added to the participants list, or given to participant_selector
 -- Non participants and Inactive participants (who join after start) will be spawned as spectator
 Event.add(defines.events.on_player_joined_game, function(event)
     local player  = game.players[event.player_index]
     local started = primitives.state == 'Started'
     local participant = Roles.player_has_role(player, 'Participant')
-    if participant and Mini_games.add_participant(player) then
+    if participant and Mini_games.player_is_participant(player) then
         if started then raise_event('on_participant_joined', player) end
+    elseif participant and not started then
+        check_participant_selector_join(player)
     elseif primitives.current_game then
         Mini_games.respawn_spectator(player)
     end
@@ -265,16 +318,16 @@ end)
 
 --- Triggered when a player leaves the game, will trigger on_participant_left if there is a game running
 -- Active participants who leave after game start will be trigger on_participant_left
--- Active participants who leave before game start will be removed from the participants list
+-- (In)Active participants who leave before game start will be removed from the participants list, and given to participant_selector
 -- Non participants and Inactive participants will be moved to lobby
 Event.add(defines.events.on_player_left_game, function(event)
     local player = game.players[event.player_index]
     local started = primitives.state == 'Started'
-    local participant = Mini_games.player_is_participant(player)
-    if started and participant then
+    local participant = Roles.player_has_role(player, 'Participant')
+    if started and Mini_games.player_is_participant(player) then
         raise_event('on_participant_left', player)
-    elseif participant then
-        Mini_games.remove_participant(player)
+    elseif participant and not started then
+        check_participant_selector_leave(player)
     elseif primitives.current_game then
         Mini_games.respawn_spectator(player)
     end
@@ -304,16 +357,19 @@ local function start_from_lobby(name, args)
 end
 
 --- Start a mini game from this server, calls on_participant_joined then on_start
-local start_game = Token.register(function()
-    if primitives.timeout_end ~= game.tick then return end
-    local mini_game = Mini_games.mini_games[primitives.current_game]
+local start_game = Token.register(function(timeout_nonce)
+    if primitives.timeout_nonce ~= timeout_nonce then return end
+    local mini_game = Mini_games.get_current_game()
     primitives.start_tick = game.tick
     primitives.state = 'Starting'
+    WaitingGui.remove_gui()
 
+    local surface, selector = mini_game.surface_name, mini_game.participant_selector
     for _, player in ipairs(game.connected_players) do
         Mini_games.respawn_spectator(player)
-        if mini_game.surface_name then
-            player.teleport({0,0}, mini_game.surface_name)
+        if surface then player.teleport({0,0}, surface) end
+        if selector then
+            xpcall(mini_game.participant_selector, internal_error, player, true)
         end
     end
 
@@ -329,18 +385,23 @@ local start_game = Token.register(function()
     primitives.state = 'Started'
 end)
 
+--- Show the loading screen to a player, used to show the loading screen to a player, this will auto update until game is started
+function Mini_games.show_loading_screen(player)
+    LoadingGui.show_gui({ player_index = player.index, tick = primitives.start_tick }, primitives.current_game)
+end
+
 --- Check if the game is ready to start, used to check if the game is ready to start once per second
 local check_ready
 check_ready = Token.register(function()
-    local mini_game = Mini_games.mini_games[primitives.current_game]
+    local mini_game = Mini_games.get_current_game()
     local success, ready = xpcall(mini_game.ready_condition, internal_error)
     if not success then
         Event.remove_removable_nth_tick(60, check_ready)
     elseif ready then
         Event.remove_removable_nth_tick(60, check_ready)
         game.print('Game starts in 10 seconds')
-        primitives.timeout_end = game.tick + 600
-        Task.set_timeout(10, start_game)
+        primitives.timeout_nonce = math.random()
+        Task.set_timeout(10, start_game, primitives.timeout_nonce)
         LoadingGui.remove_gui()
     else
         LoadingGui.update_gui(primitives.start_tick)
@@ -348,18 +409,48 @@ check_ready = Token.register(function()
 end)
 
 --- Show the loading screen to a player, used to show the loading screen to a player, this will auto update until game is started
-function Mini_games.show_loading_screen(player)
-    LoadingGui.show_gui({ player_index = player.index }, primitives.current_game)
+function Mini_games.show_waiting_screen(player)
+    WaitingGui.show_gui({ player_index = player.index }, primitives.current_game, #participants, primitives.participant_requirement)
+end
+
+--- Check if the game has enough participants to start
+function check_participant_count()
+    if primitives.state ~= 'Loading' then return end
+    local mini_game = Mini_games.get_current_game()
+    if not mini_game or #participants < primitives.participant_requirement then
+        Event.remove_removable_nth_tick(60, check_ready)
+        primitives.timeout_nonce = 0
+        LoadingGui.remove_gui()
+        WaitingGui.update_gui(#participants, primitives.participant_requirement)
+        return
+    end
+
+    WaitingGui.remove_gui(true)
+    if mini_game.ready_condition then
+        Event.add_removable_nth_tick(60, check_ready)
+        if not mini_game.show_load_after_wait then
+            for _, player in ipairs(game.connected_players) do
+                Mini_games.show_loading_screen(player)
+            end
+        end
+    else
+        game.print('Game starts in 10 seconds')
+        primitives.timeout_nonce = math.random()
+        Task.set_timeout(10, start_game, primitives.timeout_nonce)
+    end
 end
 
 --- Starts a mini game if no other games are running, calls on_init then on_participant_added
 function Mini_games.start_game(name, args)
     if vars.is_lobby then return start_from_lobby(name, args) end
 
+    -- Setup and verify all args passed to the game
     args = args or {}
     local mini_game = assert(Mini_games.mini_games[name], 'This mini game does not exist')
     assert(mini_game.options == #args, 'Wrong number of arguments')
     assert(primitives.current_game == nil, 'A game is already running, please use /stop')
+    primitives.participant_requirement = 0
+    primitives.custom_selector = false
     primitives.current_game = name
     primitives.start_tick = game.tick
     primitives.state = 'Loading'
@@ -383,17 +474,38 @@ function Mini_games.start_game(name, args)
         xpcall(on_init, internal_error, args)
     end
 
-    for _, player in ipairs(participants) do
-        raise_event('on_participant_added', player)
+    local done, selector, required = {}, mini_game.participant_selector, primitives.participant_requirement
+    local all_participants = Roles.get_role_by_name('Participant'):get_players(true)
+    if #all_participants > 0 then table.shuffle_table(all_participants) end
+
+    if selector then
+        -- With a custom selector, first clear the participants table, then call the selector
+        for index in ipairs(participants) do
+            participants[index] = nil
+        end
+        for _, player in ipairs(all_participants) do
+            done[player.name] = true
+            xpcall(selector, internal_error, player)
+        end
+    else
+        -- When no selector, first raise the added event for existing participants, then attempt to fill to the required
+        for _, player in ipairs(participants) do
+            raise_event('on_participant_added', player)
+            done[player.name] = true
+        end
+        for _, player in ipairs(all_participants) do
+            if required ~= 0 and #participants >= required then break end
+            if not done[player.name] then done[player.name] = Mini_games.add_participant(player) end
+        end
     end
 
-    if mini_game.ready_condition then
-        Event.add_removable_nth_tick(60, check_ready)
-    else
-        game.print('Game starts in 10 seconds')
-        primitives.timeout_end = game.tick + 600
-        Task.set_timeout(10, start_game)
+    for _, player in ipairs(game.connected_players) do
+        if not mini_game.hide_wait_gui or not done[player.name] then
+            Mini_games.show_waiting_screen(player)
+        end
     end
+
+    check_participant_count()
 end
 
 ----- Stopping Mini Games -----
@@ -413,9 +525,9 @@ function Mini_games.format_airtable(args)
 end
 
 --- Stop a mini game from this server, sends all players to lobby then calls on_close
-local close_game = Token.register(function()
-    if primitives.timeout_end ~= game.tick then return end
-    local mini_game = Mini_games.mini_games[primitives.current_game]
+local close_game = Token.register(function(timeout_nonce)
+    if primitives.timeout_nonce ~= timeout_nonce then return end
+    local mini_game = Mini_games.get_current_game()
     primitives.state = 'Closing'
 
     for _, player in ipairs(game.connected_players) do
@@ -433,7 +545,7 @@ end)
 
 --- Stop a mini game, calls on_stop then on_participant_removed
 function Mini_games.stop_game()
-    local mini_game = Mini_games.mini_games[primitives.current_game]
+    local mini_game = Mini_games.get_current_game()
     local skip_timeout = primitives.state ~= 'Started'
     Event.remove_removable_nth_tick(60, check_ready)
     primitives.state = 'Stopping'
@@ -465,13 +577,15 @@ function Mini_games.stop_game()
     end
 
     if skip_timeout then
+        LoadingGui.remove_gui()
+        WaitingGui.remove_gui()
         game.print('Game start canceled')
-        primitives.timeout_end = game.tick + 1
-        Task.set_timeout_in_ticks(1, close_game)
+        primitives.timeout_nonce = math.random()
+        Task.set_timeout_in_ticks(1, close_game, primitives.timeout_nonce)
     else
         game.print('Returning to lobby in 10 seconds')
-        primitives.timeout_end = game.tick + 600
-        Task.set_timeout(10, close_game)
+        primitives.timeout_nonce = math.random()
+        Task.set_timeout(10, close_game, primitives.timeout_nonce)
     end
 
 end

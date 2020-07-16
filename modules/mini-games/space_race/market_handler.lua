@@ -3,6 +3,7 @@ local Token = require 'utils.token'
 local Task = require 'utils.task'
 local Global = require 'utils.global'
 local MarketItems = require 'modules.mini-games.space_race.market_items'
+local Mini_games = require "expcore.Mini_games"
 
 local unlock_progress = {
     force_USA = {
@@ -496,7 +497,7 @@ local function on_research_finished(event)
     check_random_research_unlock(research)
     remote.call('space-race', 'remove_recipes')
 
-    if not remote.call('space-race', 'get_game_status') then
+    if Mini_games.get_current_state() ~= 'Started' then
         return
     end
 
