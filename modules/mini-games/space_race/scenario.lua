@@ -43,7 +43,6 @@ local disabled_recipes = config.disabled_recipes
 
 --- Global Variables
 local primitives = {
-    players_needed = 1,
     startup_timer = 30*3600,
     force_USA = nil,
     force_USSR = nil,
@@ -68,13 +67,11 @@ end
 
 --- Called before the game starts and before any players are added
 local function on_init(args)
-    Mini_games.set_participant_requirement(tonumber(args[1]))
-    primitives.players_needed = tonumber(args[1])
-    primitives.startup_timer = tonumber(args[2]) * 3600
+    primitives.startup_timer = tonumber(args[1]) * 3600
     game.difficulty_settings.technology_price_multiplier = 0.5
 
-    local force_USA = game.create_force(args[3] or 'United Factory Workers')
-    local force_USSR = game.create_force(args[4] or 'Union of Factory Employees')
+    local force_USA = game.create_force(args[2] or 'United Factory Workers')
+    local force_USSR = game.create_force(args[3] or 'Union of Factory Employees')
 
     local surface = MS.generate_surface('Space_Race')
     surface.min_brightness = 0;
@@ -188,9 +185,7 @@ end
 local function participant_selector(player, remove_selector)
     if remove_selector then
         Gui.destroy_if_valid(player.gui.center['Space-Race'])
-        if Mini_games.get_current_state() == 'Loading' then
-            Mini_games.show_waiting_screen(player)
-        end
+        Mini_games.show_waiting_screen(player)
     else
         join_gui.show_gui{ player_index = player.index }
     end
@@ -310,20 +305,6 @@ function Public.join_usa(player)
         return false
     end
 
-    if player.character then
-        local empty_inventory =
-        player.get_inventory(defines.inventory.character_main).is_empty() and
-        player.get_inventory(defines.inventory.character_trash).is_empty() and
-        player.get_inventory(defines.inventory.character_ammo).is_empty() and
-        player.get_inventory(defines.inventory.character_armor).is_empty() and
-        player.get_inventory(defines.inventory.character_guns).is_empty() and
-        player.crafting_queue_size == 0
-        if not empty_inventory then
-            player.print('[color=red]Failed to join [/color][color=yellow]'..force_USA.name..',[/color][color=red] you need an empty inventory![/color]')
-            return false
-        end
-    end
-
     player.force = force_USA
     player.print('[color=green]You have joined '..force_USA.name..'![/color]')
     Mini_games.show_waiting_screen(player)
@@ -342,20 +323,6 @@ function Public.join_ussr(player)
         return false
     end
 
-    if player.character then
-        local empty_inventory =
-        player.get_inventory(defines.inventory.character_main).is_empty() and
-        player.get_inventory(defines.inventory.character_trash).is_empty() and
-        player.get_inventory(defines.inventory.character_ammo).is_empty() and
-        player.get_inventory(defines.inventory.character_armor).is_empty() and
-        player.get_inventory(defines.inventory.character_guns).is_empty() and
-        player.crafting_queue_size == 0
-        if not empty_inventory then
-            player.print('[color=red]Failed to join [/color][color=yellow]'..force_USSR.name..',[/color][color=red] you need an empty inventory![/color]')
-            return false
-        end
-    end
-
     player.force = force_USSR
     player.print('[color=green]You have joined '..force_USSR.name..'![/color]')
     Mini_games.show_waiting_screen(player)
@@ -365,6 +332,11 @@ function Public.join_ussr(player)
 end
 
 ----- Game Stop -----
+
+--- When a participant is removed move them to the player force
+local function on_player_removed(event)
+    game.players[event.player_index].force = 'player'
+end
 
 --- Used to stop a game
 local function stop()
@@ -557,18 +529,6 @@ end
 --- Added a remote interface
 remote.add_interface('space-race', Public)
 
---- Text entry for the number of players who will play
-local text_field_for_players =
-Gui.element{
-    type = 'textfield',
-    tooltip = 'Player Count',
-    text  = "1",
-    numeric = true,
-}
-:style{
-  width = 50
-}
-
 --- Text entry for the start up time for the teams
 local text_field_for_startup =
 Gui.element{
@@ -606,7 +566,6 @@ Gui.element{
 --- Main gui for starting the game
 local main_gui =
 Gui.element(function(_, parent)
-    text_field_for_players(parent)
     text_field_for_startup(parent)
     text_field_for_usa_name(parent)
     text_field_for_ussr_name(parent)
@@ -616,10 +575,9 @@ end)
 local function gui_callback(parent)
     local args = {}
 
-    args[1] = tonumber(parent[text_field_for_players.name].text)
-    args[2] = tonumber(parent[text_field_for_startup.name].text)
-    args[3] = parent[text_field_for_usa_name.name].text
-    args[4] = parent[text_field_for_ussr_name.name].text
+    args[1] = tonumber(parent[text_field_for_startup.name].text)
+    args[2] = parent[text_field_for_usa_name.name].text
+    args[3] = parent[text_field_for_ussr_name.name].text
 
     return args
 end
@@ -627,13 +585,14 @@ end
 --- Register the game to the mini game module
 local space_race = Mini_games.new_game("Space_Race")
 space_race:set_core_events(on_init, start, stop, on_close)
-space_race:add_surface('Space_Race', 'modules.mini-games.space_race.map_gen.map')
+space_race:add_map_gen('Space_Race', 'modules.mini-games.space_race.map_gen.map')
 space_race:set_ready_condition(ready_condition)
 space_race:set_participant_selector(participant_selector, true)
 space_race:set_gui(main_gui, gui_callback)
-space_race:add_option(4)
+space_race:add_option(3)
 
 space_race:add_event(Mini_games.events.on_participant_joined, on_player_joined)
+space_race:add_event(Mini_games.events.on_participant_removed, on_player_removed)
 
 space_race:add_event(defines.events.on_rocket_launched, on_rocket_launched)
 space_race:add_event(defines.events.on_built_entity, on_built_entity)

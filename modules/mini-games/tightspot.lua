@@ -230,8 +230,6 @@ local function on_init(args)
         recipe_list[item].enabled = true
     end
 
-    -- Set the number of required participants
-    Mini_games.set_participant_requirement(0)
 end
 
 --- When a player is added create their island
@@ -726,7 +724,7 @@ end)
 
 --- Add a toolbar button to toggle the main gui
 Gui.left_toolbar_button("item/coin", "money", game_gui, function(player)
-    return Mini_games.player_is_participant(player) and Mini_games.get_running_game() == "Tight_spot"
+    return Mini_games.is_participant(player) and Mini_games.get_running_game() == "Tight_spot"
 end)
 
 --- Drop down used to select a level
@@ -777,6 +775,7 @@ end
 local tight = Mini_games.new_game("Tight_spot")
 tight:set_core_events(on_init, start, stop, on_close)
 tight:set_gui(main_gui, gui_callback)
+tight:add_surfaces(1, 'tigth_spot_lv:1', 'tight_spot_lv:2')
 tight:add_option(2)
 
 tight:add_event(defines.events.on_built_entity, on_entity_placed)

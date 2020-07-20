@@ -150,9 +150,6 @@ local function on_init(args)
 
     -- Setup the gate areas
     setup_areas()
-
-    -- Set the number of required participants
-    Mini_games.set_participant_requirement(tonumber(args[3]))
 end
 
 --- When a player is added create a car for them
@@ -493,26 +490,12 @@ Gui.element{
   width = 25
 }
 
---- Used to select the number of players to compete
--- @element text_field_for_players
-local text_field_for_players =
-Gui.element{
-    type = 'textfield',
-    text = '1',
-    numeric = true,
-    tooltip = 'Players'
-}
-:style{
-  width = 25
-}
-
 --- Main gui used to start the game
 -- @element main_gui
 local main_gui =
 Gui.element(function(_,parent)
     fuel_dropdown(parent)
     text_field_for_laps(parent)
-    text_field_for_players(parent)
 end)
 
 --- Used to read the data from the gui
@@ -526,9 +509,6 @@ local function gui_callback(parent)
     local required_laps = parent[text_field_for_laps.name].text
     args[2] = required_laps
 
-    local players = parent[text_field_for_players.name].text
-    args[3] = players
-
     return args
 end
 
@@ -536,8 +516,8 @@ end
 local race = Mini_games.new_game("Race_game")
 race:set_core_events(on_init, start, stop, on_close)
 race:set_gui(main_gui, gui_callback)
-race:add_surface('Race game')
-race:add_option(3) -- how many options are needed with /start
+race:add_surfaces(1, 'Race game')
+race:add_option(2) -- how many options are needed with /start
 
 race:add_event(defines.events.on_player_changed_position, player_move)
 race:add_event(defines.events.on_entity_died, car_destroyed)

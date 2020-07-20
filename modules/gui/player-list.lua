@@ -151,7 +151,7 @@ end)
 --- Button on the top flow used to toggle the player list container
 -- @element toggle_left_element
 Gui.left_toolbar_button('entity/character', {'player-list.main-tooltip'}, player_list_container, function(player)
-    local allowed = not Mini_games.player_is_participant(player) and Mini_games.get_running_game() ~= nil
+    local allowed = not Mini_games.is_participant(player) and Mini_games.get_running_game() ~= nil
     if player.online_time > 1 then Gui.toggle_left_element(player, player_list_container, allowed) end
     return allowed
 end)
