@@ -30,7 +30,6 @@ local participants = {}
 local primitives = { state = 'Closed' }
 local vars = {
     is_lobby = false,
-    server_address = ""
 }
 
 gen.init{}
@@ -467,7 +466,6 @@ local start_game = Token.register(function(timeout_nonce)
         type      = 'Started_game',
         players   = Mini_games.get_participant_names(),
         name      = mini_game.name,
-        server    = vars.server_address
     }
 
     dlog('Start:', mini_game.name, 'Player Count:', #data.players)
@@ -669,7 +667,6 @@ function Mini_games.format_airtable(args)
         Silver_data=args[4],
         Bronze=args[5],
         Bronze_data=args[6],
-        server=vars.server_address,
     }
     return game.table_to_json(data)
 end
@@ -786,13 +783,6 @@ Commands.new_command('set_lobby', 'Command to tell this server if its the lobby.
 :add_param('data',"boolean")
 :register(function(_,data,_)
     vars.is_lobby = data
-end)
-
---- Sets the address of this server
-Commands.new_command('set_server_address', 'Command to set the ip:port of this server.')
-:add_param('data',false)
-:register(function(_,_,data)
-    vars.server_address = data
 end)
 
 ----- Main Gui -----
