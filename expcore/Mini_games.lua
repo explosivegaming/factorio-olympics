@@ -421,10 +421,10 @@ local function start_from_lobby(name, player_count, args)
         player_count = player_count,
         args         = args,
         name         = name,
-        server       = vars.server_address
+        server       = server_address
     }
 
-    dlog('Start lobby:', name, ' Address:', vars.server_address)
+    dlog('Start lobby:', name, ' Address:', server_address)
     game.write_file('mini_games/starting_game', game.table_to_json(data), false)
 end
 
