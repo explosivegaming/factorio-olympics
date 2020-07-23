@@ -1,8 +1,5 @@
 --- Util Requires
-local Event = require 'utils.event'
 local Global = require 'utils.global'
-local Token = require 'utils.token'
-local Task = require 'utils.task'
 local Color = require 'utils.color_presets'
 local MS = require 'utils.map_gen.minigame_surface'
 
@@ -17,15 +14,13 @@ local Market_Items = require 'modules.mini-games.space_race.market_items'
 local config = require 'config.mini_games.space_race'
 
 --- Gui and map gen requires
+local join_gui = require 'modules.mini-games.space_race.join_gui'
 local cliff = require 'modules.mini-games.space_race.cliff_generator'
-local load_gui = require 'modules.mini-games.space_race.gui.load_gui'
-local join_gui = require 'modules.mini-games.space_race.gui.join_gui'
-local wait_gui = require 'modules.mini-games.space_race.gui.wait_gui'
-local won_gui  = require 'modules.mini-games.space_race.gui.won_gui'
 local market_events = require 'modules.mini-games.space_race.market_handler'
-local uranium_gen_events = require('modules.mini-games.space_race.map_gen.uranium_island').events
+local uranium_gen = require('modules.mini-games.space_race.map_gen.uranium_island')
 local safe_ore_gen_on_init = require('modules.mini-games.space_race.map_gen.safe_zone_ores').on_init
 local wild_ore_gen_on_init = require('modules.mini-games.space_race.map_gen.wilderness_ores').on_init
+local uranium_gen_events, uranium_gen_reset = uranium_gen.events, uranium_gen.reset
 
 --- Local Variables
 local player_kill_reward = config.player_kill_reward
@@ -48,11 +43,7 @@ local disabled_recipes = config.disabled_recipes
 
 --- Global Variables
 local primitives = {
-    players_needed = 1,
     startup_timer = 30*3600,
-    game_started = false,
-    game_generating = false,
-    started_tick = nil,
     force_USA = nil,
     force_USSR = nil,
     won = nil
@@ -74,14 +65,13 @@ function Public.remove_recipes()
     end
 end
 
---- Main init function for the mini game
-local function init(args)
-    primitives.players_needed = tonumber(args[1])
-    primitives.startup_timer = tonumber(args[2]) * 3600
+--- Called before the game starts and before any players are added
+local function on_init(args)
+    primitives.startup_timer = tonumber(args[1]) * 3600
     game.difficulty_settings.technology_price_multiplier = 0.5
 
-    local force_USA = game.create_force(args[3] or 'United Factory Workers')
-    local force_USSR = game.create_force(args[4] or 'Union of Factory Employees')
+    local force_USA = game.create_force(args[2] or 'United Factory Workers')
+    local force_USSR = game.create_force(args[3] or 'Union of Factory Employees')
 
     local surface = MS.generate_surface('Space_Race')
     surface.min_brightness = 0;
@@ -184,7 +174,6 @@ local function init(args)
     primitives.force_USSR = force_USSR
 
     Public.remove_recipes()
-    Public.update_gui()
     safe_ore_gen_on_init()
     wild_ore_gen_on_init()
     if uranium_gen_events.on_init then
@@ -192,20 +181,31 @@ local function init(args)
     end
 end
 
---- Respawn a character making sure it has the correct items and permission group
-local function restore_character(player)
-    if primitives.game_started then
-        local character = player.character
-        if character then
-            character.destroy()
-        end
-        player.set_controller {type = defines.controllers.god}
+--- Show the join team gui when wanting to select participants
+local function participant_selector(player, remove_selector)
+    if remove_selector then
+        Gui.destroy_if_valid(player.gui.center['Space-Race'])
+        Mini_games.show_waiting_screen(player)
+    else
+        join_gui.show_gui{ player_index = player.index }
+    end
+end
+
+--- When a player joins teleport them to there base, if start of game then give them a character
+local get_teleport_location
+local function on_player_joined(event)
+    local player = game.players[event.player_index]
+
+    if Mini_games.get_current_state() == 'Starting' then
+        if player.character then player.character.destroy() end
         player.create_character()
         game.permissions.get_group('Default').add_player(player)
         for _, item in pairs(starting_items) do
             player.insert(item)
         end
     end
+
+    player.teleport(get_teleport_location(player.force, true), MS.get_surface())
 end
 
 --- Tile map used to produce the two out of map walls
@@ -267,26 +267,12 @@ local function generate_structures()
 end
 
 --- Used to start the game after the map has been generated and teams assigned
-local get_teleport_location
-local function start_game()
-    primitives.game_started = true
-    primitives.started_tick = game.tick
+local function start()
     game.forces.enemy.evolution_factor = 0
 
     local surface = MS.get_surface()
-    local force_USA = primitives.force_USA
-    force_USA.chart(surface, {{x = -380, y = 64}, {x = -420, y = -64}})
-    for _, player in pairs(force_USA.players) do
-        restore_character(player)
-        player.teleport(get_teleport_location(force_USA, true), MS.get_surface())
-    end
-
-    local force_USSR = primitives.force_USSR
-    force_USSR.chart(surface, {{x = 380, y = 64}, {x = 420, y = -64}})
-    for _, player in pairs(force_USSR.players) do
-        restore_character(player)
-        player.teleport(get_teleport_location(force_USSR, true), MS.get_surface())
-    end
+    primitives.force_USA.chart(surface, {{x = -380, y = 64}, {x = -420, y = -64}})
+    primitives.force_USSR.chart(surface, {{x = 380, y = 64}, {x = 420, y = -64}})
 
     cliff.generate_cliffs(surface)
     surface.set_tiles(tiles)
@@ -295,16 +281,6 @@ end
 
 ----- Pre Game Start -----
 
---- Used to start the game after a 10 second count down
-local check_map_gen_is_done
-local start_game_delayed = Token.register(function()
-    if primitives.started_tick == -1 then
-        primitives.started_tick = 0
-        load_gui.remove_gui()
-        start_game()
-    end
-end)
-
 --- Check that a tile is valid and is the correct type
 local function check_tile_type(surface, x, y, name)
     local tile = surface.get_tile{x, y}
@@ -312,49 +288,11 @@ local function check_tile_type(surface, x, y, name)
 end
 
 --- Check if the map generation is done, ran once per second until generation is done
-check_map_gen_is_done = Token.register(function()
-    local num_usa_players = #primitives.force_USA.connected_players
-    local num_ussr_players = #primitives.force_USSR.connected_players
-    local num_players = num_usa_players + num_ussr_players
-    if not primitives.game_started and num_players >= primitives.players_needed then
-        local surface = MS.get_surface()
-        if
-            primitives.started_tick ~= -1
-            and check_tile_type(surface, 388.5, 0,  'landfill')   and check_tile_type(surface, -388, 0,  'landfill')
-            and check_tile_type(surface, 388,   60, 'out-of-map') and check_tile_type(surface, -388, 60, 'out-of-map')
-            and check_tile_type(surface, 479,   0,  'water')      and check_tile_type(surface, -479, 0,  'water')
-        then
-            primitives.started_tick = -1
-            game.print('[color=yellow]Game starts in 10 seconds![/color]')
-            Task.set_timeout_in_ticks(599, start_game_delayed, {})
-            Event.remove_removable_nth_tick(60, check_map_gen_is_done)
-            return load_gui.remove_gui()
-        end
-        load_gui.show_gui_to_all()
-    else
-        primitives.started_tick = nil
-        Event.remove_removable_nth_tick(60, check_map_gen_is_done)
-        load_gui.remove_gui()
-    end
-end)
-
---- Check if the game is ready to start, this will start the map gen checking
-local function check_ready_to_start()
-    if primitives.game_started then
-        return
-    end
-    local num_usa_players = #primitives.force_USA.connected_players
-    local num_ussr_players = #primitives.force_USSR.connected_players
-    local num_players = num_usa_players + num_ussr_players
-    if not primitives.game_started and num_players >= primitives.players_needed then
-        if primitives.started_tick == nil then
-            primitives.started_tick = game.tick
-            Event.add_removable_nth_tick(60, check_map_gen_is_done)
-        end
-    else
-        local message = primitives.force_USA.name .. ' has ' .. num_usa_players .. ' players\n ' .. primitives.force_USSR.name .. ' has ' .. num_ussr_players .. ' players\n\n' .. primitives.players_needed - num_players .. ' more players needed to start!'
-        load_gui.show_gui_to_all(message)
-    end
+local function ready_condition()
+    local surface = MS.get_surface()
+    return check_tile_type(surface, 388.5, 0,  'landfill')   and check_tile_type(surface, -388, 0,  'landfill')
+       and check_tile_type(surface, 388,   60, 'out-of-map') and check_tile_type(surface, -388, 60, 'out-of-map')
+       and check_tile_type(surface, 479,   0,  'water')      and check_tile_type(surface, -479, 0,  'water')
 end
 
 --- Make a player join team usa
@@ -367,23 +305,10 @@ function Public.join_usa(player)
         return false
     end
 
-    if player.character then
-        local empty_inventory =
-        player.get_inventory(defines.inventory.character_main).is_empty() and
-        player.get_inventory(defines.inventory.character_trash).is_empty() and
-        player.get_inventory(defines.inventory.character_ammo).is_empty() and
-        player.get_inventory(defines.inventory.character_armor).is_empty() and
-        player.get_inventory(defines.inventory.character_guns).is_empty() and
-        player.crafting_queue_size == 0
-        if not empty_inventory then
-            player.print('[color=red]Failed to join [/color][color=yellow]'..force_USA.name..',[/color][color=red] you need an empty inventory![/color]')
-            return false
-        end
-    end
-
     player.force = force_USA
     player.print('[color=green]You have joined '..force_USA.name..'![/color]')
-    check_ready_to_start()
+    Mini_games.show_waiting_screen(player)
+    Mini_games.add_participant(player)
     Public.update_gui()
     return true
 end
@@ -398,50 +323,49 @@ function Public.join_ussr(player)
         return false
     end
 
-    if player.character then
-        local empty_inventory =
-        player.get_inventory(defines.inventory.character_main).is_empty() and
-        player.get_inventory(defines.inventory.character_trash).is_empty() and
-        player.get_inventory(defines.inventory.character_ammo).is_empty() and
-        player.get_inventory(defines.inventory.character_armor).is_empty() and
-        player.get_inventory(defines.inventory.character_guns).is_empty() and
-        player.crafting_queue_size == 0
-        if not empty_inventory then
-            player.print('[color=red]Failed to join [/color][color=yellow]'..force_USSR.name..',[/color][color=red] you need an empty inventory![/color]')
-            return false
-        end
-    end
-
     player.force = force_USSR
     player.print('[color=green]You have joined '..force_USSR.name..'![/color]')
-    check_ready_to_start()
+    Mini_games.show_waiting_screen(player)
+    Mini_games.add_participant(player)
     Public.update_gui()
     return true
 end
 
 ----- Game Stop -----
 
+--- When a participant is removed move them to the player force
+local function on_player_removed(event)
+    game.players[event.player_index].force = 'player'
+end
+
+--- Used to stop a game
+local function stop()
+    local won, player_names = primitives.won, {}
+    for index, player in ipairs(game.connected_players) do
+        local gui = player.gui.center['Space-Race']
+        Gui.destroy_if_valid(gui)
+        if player.force.name == won then
+            player_names[index] = player.name
+        end
+    end
+
+    return Mini_games.format_airtable{primitives.won, player_names}
+end
+
 --- Used to stop a game and reset all variables, called by mini game manager
-local function stop_game()
+local function on_close()
     game.merge_forces(primitives.force_USA, game.forces.player)
     game.merge_forces(primitives.force_USSR, game.forces.player)
-    Event.remove_removable_nth_tick(60, check_map_gen_is_done)
     MS.remove_surface('Space_Race')
 
     primitives.force_USA = nil
     primitives.force_USSR = nil
-    primitives.game_started = false
-    primitives.game_generating = false
-    primitives.started_tick = nil
     primitives.won = nil
 
-    for i, player in ipairs(game.connected_players) do
-        if player.character then player.character.destroy() end
-        player.set_controller{type = defines.controllers.god}
-        player.create_character()
-        local center = player.gui.center
-        Gui.destroy_if_valid(center['Space-Race-Lobby'])
-        Gui.destroy_if_valid(center['Space-Race-Wait'])
+    uranium_gen_reset()
+
+    for i, player in ipairs(game.players) do
+        Gui.destroy_if_valid(player.gui.center['Space-Race'])
     end
 end
 
@@ -499,7 +423,7 @@ Commands.new_command('warp', 'Use to switch between PVP and Safe-zone in Space R
         return Commands.error
     end
 
-    local tick = game.tick - primitives.started_tick
+    local tick = game.tick - Mini_games.get_start_time()
     if tick < primitives.startup_timer then
         local time_left = primitives.startup_timer - tick
         if time_left > 60 then
@@ -544,21 +468,6 @@ function Public.get_teams()
     return {primitives.force_USA, primitives.force_USSR}
 end
 
---- Get an array of the teams
-function Public.get_players_needed()
-    return primitives.players_needed
-end
-
---- Get the game status
-function Public.get_game_status()
-    return primitives.game_started
-end
-
---- Get the tick the game started
-function Public.get_started_tick()
-    return primitives.started_tick
-end
-
 ----- Events -----
 
 --- Triggered when a rocket is launch, causes that team to win
@@ -589,7 +498,7 @@ end
 
 --- Called once per second, will update a players movement speed based on their health
 local function check_damaged_players()
-    for k, player in pairs (game.connected_players) do
+    for k, player in pairs (Mini_games.get_participants()) do
         if player.character and player.character.health ~= nil then
             local health_missing = 1 - math.ceil(player.character.health) / (250 + player.character.character_health_bonus)
             if health_missing > 0 then
@@ -602,48 +511,15 @@ local function check_damaged_players()
 	end
 end
 
---- Triggered when a player joins the game
-local function on_player_joined(event)
-    local player = game.players[event.player_index]
-    if player.force ~= game.forces.player then
-        player.teleport(get_teleport_location(player.force, true))
-    end
-    Public.update_gui()
-end
-
---- Triggered when a player leaves the game
-local function on_player_left(event)
-    local player = game.players[event.player_index]
-    player.teleport({-35, 55}, "nauvis")
-    Public.update_gui()
-end
-
 ----- Gui and Registering -----
-
---- Show the correct gui to the player
-function Public.show_gui(event)
-    if #game.connected_players < primitives.players_needed and (not remote.call('space-race', 'get_game_status')) then
-        game.forces.enemy.evolution_factor = 0
-        wait_gui.show_gui(event)
-        return
-    end
-    local won = primitives.won
-    if won then
-        won_gui.show_gui(event, won)
-    else
-        join_gui.show_gui(event)
-    end
-end
 
 --- Update the gui for all players
 function Public.update_gui()
-    local players = game.connected_players
-    for i = 1, #players do
-        local player = players[i]
-        local center = player.gui.center
-        local gui = center['Space-Race-Lobby']
-        if player.force.name == 'player' then
-            Public.show_gui({player_index = player.index})
+    for _, player in ipairs(game.connected_players) do
+        local gui = player.gui.center['Space-Race']
+        if gui and player.force.name == 'player' then
+            -- todo make an update function
+            join_gui.show_gui{player_index = player.index}
         elseif gui then
             Gui.destroy_if_valid(gui)
         end
@@ -652,18 +528,6 @@ end
 
 --- Added a remote interface
 remote.add_interface('space-race', Public)
-
---- Text entry for the number of players who will play
-local text_field_for_players =
-Gui.element{
-    type = 'textfield',
-    tooltip = 'Player Count',
-    text  = "1",
-    numeric = true,
-}
-:style{
-  width = 50
-}
 
 --- Text entry for the start up time for the teams
 local text_field_for_startup =
@@ -701,48 +565,44 @@ Gui.element{
 
 --- Main gui for starting the game
 local main_gui =
-Gui.element(function(_,parent)
-    local main_flow = parent.add{ type = 'flow', name = "Space_Race_flow"}
-    text_field_for_players(main_flow)
-    text_field_for_startup(main_flow)
-    text_field_for_usa_name(main_flow)
-    text_field_for_ussr_name(main_flow)
+Gui.element(function(_, parent)
+    text_field_for_startup(parent)
+    text_field_for_usa_name(parent)
+    text_field_for_ussr_name(parent)
 end)
 
 --- Used to read args from the gui
 local function gui_callback(parent)
-    local flow = parent["Space_Race_flow"]
     local args = {}
 
-    args[1] = tonumber(flow[text_field_for_players.name].text)
-    args[2] = tonumber(flow[text_field_for_startup.name].text)
-    args[3] = flow[text_field_for_usa_name.name].text
-    args[4] = flow[text_field_for_ussr_name.name].text
+    args[1] = tonumber(parent[text_field_for_startup.name].text)
+    args[2] = parent[text_field_for_usa_name.name].text
+    args[3] = parent[text_field_for_ussr_name.name].text
 
     return args
 end
 
 --- Register the game to the mini game module
 local space_race = Mini_games.new_game("Space_Race")
-space_race:set_start_function(init)
-space_race:set_stop_function(stop_game)
-space_race:add_option(4)
-space_race:add_map('nauvis', -35, 55)
+space_race:set_core_events(on_init, start, stop, on_close)
+space_race:add_map_gen('Space_Race', 'modules.mini-games.space_race.map_gen.map')
+space_race:set_ready_condition(ready_condition)
+space_race:set_participant_selector(participant_selector, true)
+space_race:set_gui(main_gui, gui_callback)
+space_race:add_option(3)
 
-space_race:add_event(defines.events.on_player_joined_game, on_player_joined)
-space_race:add_event(defines.events.on_player_left_game, on_player_left)
+space_race:add_event(Mini_games.events.on_participant_joined, on_player_joined)
+space_race:add_event(Mini_games.events.on_participant_removed, on_player_removed)
+
 space_race:add_event(defines.events.on_rocket_launched, on_rocket_launched)
 space_race:add_event(defines.events.on_built_entity, on_built_entity)
 space_race:add_event(defines.events.on_entity_died, market_events.on_entity_died)
 space_race:add_event(defines.events.on_player_died, market_events.on_player_died)
 space_race:add_event(defines.events.on_research_finished, market_events.on_research_finished)
 space_race:add_event(Retailer.events.on_market_purchase, market_events.on_market_purchase)
-space_race:add_on_nth_tick(20, check_damaged_players)
+space_race:add_nth_tick(20, check_damaged_players)
 if uranium_gen_events.on_nth_tick then
-    space_race:add_on_nth_tick(600, uranium_gen_events.on_nth_tick)
+    space_race:add_nth_tick(600, uranium_gen_events.on_nth_tick)
 end
-
-space_race:set_gui_element(main_gui)
-space_race:set_gui_callback(gui_callback)
 
 space_race:add_command('warp')

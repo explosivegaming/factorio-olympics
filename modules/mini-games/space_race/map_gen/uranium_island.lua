@@ -2,6 +2,7 @@ local b = require 'utils.map_gen.builders'
 local Global = require 'utils.global'
 local MS = require 'utils.map_gen.minigame_surface'
 
+local Mini_games = require "expcore.Mini_games"
 local Game_mode_config = (require 'config.mini_games.space_race').game_mode
 local Events = {}
 
@@ -9,14 +10,15 @@ local island_1_offset = 0
 local island_2_offset = -128
 local island_3_offset = 128
 local crafters = {}
-Global.register(
-    {
-        crafters = crafters
-    },
-    function(tbl)
-        crafters = tbl.crafters
+Global.register(crafters, function(tbl)
+    crafters = tbl
+end)
+
+local function reset()
+    for k in pairs(crafters) do
+        crafters[k] = nil
     end
-)
+end
 
 local inf = function()
     return 100000000
@@ -147,8 +149,8 @@ if Game_mode_config.king_of_the_hill then
     end
 
     Events.on_nth_tick = function()
-        if remote.call('space-race', 'get_game_status') then
-            for _, crafter in pairs(crafters) do
+        if Mini_games.get_current_state() ~= 'Started' then
+            for index, crafter in pairs(crafters) do
                 local item = crafter.get_recipe().products[1].name
                 crafter.get_output_inventory().insert({name = item, count = 1})
             end
@@ -156,4 +158,4 @@ if Game_mode_config.king_of_the_hill then
     end
 end
 
-return { shape = multiple_uranium_island, events = Events }
+return { shape = multiple_uranium_island, events = Events, reset = reset }

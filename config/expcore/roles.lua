@@ -74,7 +74,7 @@ Roles.new_role('Partner','Part')
 :set_permission_group('Trusted')
 :set_custom_color{r=241,g=196,b=15}
 :set_flag('is_spectator')
-:set_parent('Participant')
+:set_parent('Guest')
 :allow{
 }
 
