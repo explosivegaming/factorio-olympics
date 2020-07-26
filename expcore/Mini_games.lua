@@ -416,7 +416,7 @@ local function start_from_lobby(name, player_count, args)
     end
 
     local data = {
-        type         = 'Start_game',
+        type         = 'start_game',
         player_count = player_count,
         args         = args,
         name         = name,
@@ -424,7 +424,7 @@ local function start_from_lobby(name, player_count, args)
     }
 
     dlog('Start lobby:', name, ' Address:', server_address)
-    game.write_file('mini_games/starting_game', game.table_to_json(data), false)
+    game.write_file('mini_games/start_game', game.table_to_json(data), false)
 end
 
 --- Start a mini game from this server, calls on_participant_joined then on_start
@@ -463,13 +463,13 @@ local start_game = Token.register(function(timeout_nonce)
 
     -- Write the game start to file
     local data = {
-        type      = 'Started_game',
+        type      = 'started_game',
         players   = Mini_games.get_participant_names(),
         name      = mini_game.name,
     }
 
     dlog('Start:', mini_game.name, 'Player Count:', #data.players)
-    game.write_file('mini_games/starting_game', game.table_to_json(data), false)
+    game.write_file('mini_games/started__game', game.table_to_json(data), false)
     primitives.state = 'Started'
     dlog('===== State Change =====')
 end)
@@ -660,7 +660,7 @@ end
 --- Format an array to be the correct format for airtable
 function Mini_games.format_airtable(args)
     local data = {
-        type="end_game",
+        type="stopped_game",
         Gold=args[1],
         Gold_data=args[2],
         Silver=args[3],
@@ -709,7 +709,7 @@ function Mini_games.stop_game()
         dlog('Call: On Stop')
         local success, res = xpcall(on_stop, internal_error)
         if success and res then
-            game.write_file('mini_games/end_game', res, false)
+            game.write_file('mini_games/stopped_game', res, false)
         end
     end
 
