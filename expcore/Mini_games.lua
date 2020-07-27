@@ -657,20 +657,6 @@ end
 
 ----- Stopping Mini Games -----
 
---- Format an array to be the correct format for airtable
-function Mini_games.format_airtable(args)
-    local data = {
-        type="stopped_game",
-        Gold=args[1],
-        Gold_data=args[2],
-        Silver=args[3],
-        Silver_data=args[4],
-        Bronze=args[5],
-        Bronze_data=args[6],
-    }
-    return game.table_to_json(data)
-end
-
 --- Stop a mini game from this server, sends all players to lobby then calls on_close
 local close_game = Token.register(function(timeout_nonce)
     if primitives.timeout_nonce ~= timeout_nonce then return end
@@ -704,12 +690,18 @@ function Mini_games.stop_game()
     dlog('===== State Change =====')
 
     -- Calls on_stop core event to stop the game and to get the data to write to file
+    -- on_stop should return an array of position entries which are tables of the
+    -- following format: { place = integer, score = number, players = array of player names }
     local on_stop = mini_game.core_events.on_stop
     if on_stop then
         dlog('Call: On Stop')
         local success, res = xpcall(on_stop, internal_error)
-        if success and res then
-            game.write_file('mini_games/stopped_game', res, false, 0)
+        if success then
+            local event = {
+                type = "stopped_game",
+                results = res or {},
+            }
+            game.write_file('mini_games/stopped_game', game.table_to_json(event), false, 0)
         end
     end
 

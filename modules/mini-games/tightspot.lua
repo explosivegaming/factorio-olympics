@@ -383,21 +383,29 @@ local function stop()
     end)
 
     -- Print the player scores
-    local airtable = {}
+    local results = {}
     for i, score in ipairs(scores) do
         local money = score[1]
         local player_name = score[2]
         local place = Nth(i)
 
-        local index = i*2
-        airtable[index-1] = score[2]
-        airtable[index] = math.round(money,2)
+        local up_result = results[#results]
+        if up_result and up_result.score == math.round(money, 2) then
+            up_result.players[#up_result.players + 1] = player_name
+
+        else
+            results[#results + 1] = {
+                place = i,
+                players = {player_name},
+                score = math.round(money, 2)
+            }
+        end
 
         local colour = colors[place] or colors.default
         game.print(message_format:format(place, player_name, money), colour)
     end
 
-    return Mini_games.format_airtable(airtable)
+    return results
 end
 
 --- The last function to be called, used to clean up variables
