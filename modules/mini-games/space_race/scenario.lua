@@ -349,7 +349,7 @@ local function stop()
         end
     end
 
-    return Mini_games.format_airtable{primitives.won, player_names}
+    return {{ place = 1, score = 1, players = player_names }}
 end
 
 --- Used to stop a game and reset all variables, called by mini game manager

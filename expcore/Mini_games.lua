@@ -416,7 +416,7 @@ local function start_from_lobby(name, player_count, args)
     end
 
     local data = {
-        type         = 'Start_game',
+        type         = 'start_game',
         player_count = player_count,
         args         = args,
         name         = name,
@@ -424,7 +424,7 @@ local function start_from_lobby(name, player_count, args)
     }
 
     dlog('Start lobby:', name, ' Address:', server_address)
-    game.write_file('mini_games/starting_game', game.table_to_json(data), false)
+    game.write_file('mini_games/start_game', game.table_to_json(data), false, 0)
 end
 
 --- Start a mini game from this server, calls on_participant_joined then on_start
@@ -463,13 +463,13 @@ local start_game = Token.register(function(timeout_nonce)
 
     -- Write the game start to file
     local data = {
-        type      = 'Started_game',
+        type      = 'started_game',
         players   = Mini_games.get_participant_names(),
         name      = mini_game.name,
     }
 
     dlog('Start:', mini_game.name, 'Player Count:', #data.players)
-    game.write_file('mini_games/starting_game', game.table_to_json(data), false)
+    game.write_file('mini_games/started_game', game.table_to_json(data), false, 0)
     primitives.state = 'Started'
     dlog('===== State Change =====')
 end)
@@ -657,20 +657,6 @@ end
 
 ----- Stopping Mini Games -----
 
---- Format an array to be the correct format for airtable
-function Mini_games.format_airtable(args)
-    local data = {
-        type="end_game",
-        Gold=args[1],
-        Gold_data=args[2],
-        Silver=args[3],
-        Silver_data=args[4],
-        Bronze=args[5],
-        Bronze_data=args[6],
-    }
-    return game.table_to_json(data)
-end
-
 --- Stop a mini game from this server, sends all players to lobby then calls on_close
 local close_game = Token.register(function(timeout_nonce)
     if primitives.timeout_nonce ~= timeout_nonce then return end
@@ -704,12 +690,18 @@ function Mini_games.stop_game()
     dlog('===== State Change =====')
 
     -- Calls on_stop core event to stop the game and to get the data to write to file
+    -- on_stop should return an array of position entries which are tables of the
+    -- following format: { place = integer, score = number, players = array of player names }
     local on_stop = mini_game.core_events.on_stop
     if on_stop then
         dlog('Call: On Stop')
         local success, res = xpcall(on_stop, internal_error)
-        if success and res then
-            game.write_file('mini_games/end_game', res, false)
+        if success then
+            local event = {
+                type = "stopped_game",
+                results = res or {},
+            }
+            game.write_file('mini_games/stopped_game', game.table_to_json(event), false, 0)
         end
     end
 

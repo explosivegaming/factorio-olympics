@@ -252,20 +252,28 @@ local colors =  {
 --- Function called by mini game module to stop a race
 local function stop()
     -- Print the place that each player came
-    local airtable = {}
+    local results = {}
     for name, value in pairs(scores["finish_times"]) do
         local time = value[2]
         local place = Nth(value[1])
         local colour = colors[place] or colors.default
-        if colour ~= colors.default then
-            local index = value[1] * 2
-            airtable[index-1] = name
-            airtable[index] = math.round(time,2)
+
+        local up_result = results[#results]
+        if up_result and up_result.score == math.round(time, 2) then
+            up_result.players[#up_result.players + 1] = name
+
+        else
+            results[#results + 1] = {
+                place = value[1],
+                score = math.round(time, 2),
+                players = {name}
+            }
         end
+
         game.print(message_format:format(place, name, time), colour)
     end
 
-    return Mini_games.format_airtable(airtable)
+    return results
 end
 
 --- The last function to be called in order to clean up variables
