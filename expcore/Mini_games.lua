@@ -62,7 +62,7 @@ local function internal_error(error_message)
 end
 
 --- Used to debug mini game control flow
-local DEBUG = false
+local DEBUG = true
 local function dlog(...)
     if not DEBUG then return end
     log{'mini-game-log', primitives.current_game or 'None', primitives.state, table.concat({...}, ' ')}
@@ -514,8 +514,8 @@ function check_participant_count()
     local mini_game = Mini_games.get_current_game()
     local selector = mini_game.participant_selector
 
-    -- If the participants count is less than required, stop load checking, and update wait gui
-    if #participants < primitives.participant_requirement then
+    -- If the participants count is less than required, and there has been less 2 minutes waiting, stop load checking, and update wait gui
+    if #participants < primitives.participant_requirement and game.tick < primitives.start_tick + 7200 then
         WaitingGui.update_gui(#participants, primitives.participant_requirement)
         if primitives.state == 'Waiting' then return end
         primitives.state = 'Waiting'
@@ -543,6 +543,9 @@ function check_participant_count()
 
         return
     end
+
+    -- Check if we are already in loading to prevent extra calls
+    if primitives.state == 'Loading' then return end
 
     -- When requirement is met remove the gui
     dlog('Remove Waiting')
@@ -572,6 +575,9 @@ function check_participant_count()
     end
 
 end
+
+--- Used to trigger a delayed check for the player count, will force waiting to be skipped
+local delayed_player_count_check = Token.register(check_participant_count)
 
 --- Starts a mini game if no other games are running, calls on_init then on_participant_added
 function Mini_games.start_game(name, player_count, args)
@@ -652,6 +658,7 @@ function Mini_games.start_game(name, player_count, args)
     end
 
     -- Check if we are able to start now, if not then this will be checked again with add_participant
+    Task.set_timeout(120, delayed_player_count_check)
     check_participant_count()
 end
 
