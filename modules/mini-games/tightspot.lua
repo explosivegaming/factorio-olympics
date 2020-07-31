@@ -301,6 +301,7 @@ local function on_player_joined(event)
     local player = game.players[event.player_index]
     local center = centers[player.name]
     player.teleport(center, variables.level.surface)
+    player.set_controller{ type = defines.controllers.god }
 
     -- Show the main gui for the game
     local Main_gui = Gui.get_left_element(player, game_gui)

@@ -218,15 +218,16 @@ end
 function Mini_games.respawn_spectator(player)
     Gui.update_top_flow(player)
     if player.character then player.character.destroy() end
+    player.set_controller{ type = defines.controllers.god }
     if primitives.state == 'Closing' or primitives.state == 'Loading' then
         dlog('Respawn in lobby:', player.name)
         local surface = game.surfaces.nauvis
         local pos = surface.find_non_colliding_position('character', {-35, 55}, 6, 1)
-        player.create_character()
         player.teleport(pos, surface)
+        player.create_character()
     elseif primitives.current_game then
         dlog('Respawn in spectator:', player.name)
-        player.set_controller{ type = defines.controllers.god }
+        player.set_controller{ type = defines.controllers.spectator }
     end
 end
 

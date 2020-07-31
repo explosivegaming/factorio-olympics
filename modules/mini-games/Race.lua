@@ -185,8 +185,9 @@ end
 local function on_player_joined(event)
     local player = game.players[event.player_index]
     local car = cars[player.name]
-    player.create_character()
-    player.teleport(car.position, car.surface)
+    local pos = car.surface.find_non_colliding_position('character', car.position, 6, 1)
+    local character = car.surface.create_entity{name='character', position=pos, force='player'}
+    player.set_controller{type = defines.controllers.character, character = character}
     car.set_driver(player)
 end
 
