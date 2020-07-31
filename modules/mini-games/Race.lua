@@ -89,6 +89,7 @@ race_count_down = Token.register(function()
         game.print("0 --> GO!", { 0, 1, 0 })
         for _, player in ipairs(Mini_games.get_participants()) do
             local car = cars[player.name]
+            if not car or not car.valid then return Mini_games.remove_participant(player) end
             car.get_fuel_inventory().insert{name = variables["fuel"], count = 100}
             scores[player.name].time = game.tick
         end
@@ -392,9 +393,10 @@ end
 
 --- Make the car and player destructible again
 local stop_invincibility = Token.register(function(name)
-    dead_cars[name].car.destructible = true
+    local car = dead_cars[name].car
+    if car and car.valid then car.destructible = true end
     local player = dead_cars[name].player
-    player.character.destructible = true
+    if player.character then player.character.destructible = true end
 end)
 
 --- Kill all biters in a close range to the player
