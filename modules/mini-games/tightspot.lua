@@ -213,10 +213,13 @@ local function on_init(args)
 
     -- Setup all level related variables
     local level_index = tonumber(args[1])
-    variables.level = config[level_index]
-    variables.difficulty = variables.level.money[args[2]]
-    variables.loan_price = variables.level.loan_prices[args[2]]
-    variables["surface"] = game.surfaces[variables.level["surface"]]
+    local level = config[level_index]
+    if not level then return Mini_games.error_in_game('Level index out of range') end
+
+    variables.level = level
+    variables.difficulty = level.money[args[2]]
+    variables.loan_price = level.loan_prices[args[2]]
+    variables.surface = game.surfaces[level.surface]
 
     -- Save the island template
     if not save["tiles"][1] then level_save() end
