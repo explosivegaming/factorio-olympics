@@ -343,8 +343,6 @@ end
 local function stop()
     local won, player_names = primitives.won, {}
     for index, player in ipairs(game.connected_players) do
-        local gui = player.gui.center['Space-Race']
-        Gui.destroy_if_valid(gui)
         if player.force.name == won then
             player_names[index] = player.name
         end

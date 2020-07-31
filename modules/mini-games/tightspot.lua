@@ -207,10 +207,6 @@ end
 
 --- Called before the game starts and before any players are added
 local function on_init(args)
-    variables["level"] = {}
-    variables["surface"] = {}
-    variables["walls"] = {}
-
     -- Setup all level related variables
     local level_index = tonumber(args[1])
     local level = config[level_index]
@@ -220,6 +216,7 @@ local function on_init(args)
     variables.difficulty = level.money[args[2]]
     variables.loan_price = level.loan_prices[args[2]]
     variables.surface = game.surfaces[level.surface]
+    variables["walls"] = {}
 
     -- Save the island template
     if not save["tiles"][1] then level_save() end
@@ -415,17 +412,19 @@ end
 --- The last function to be called, used to clean up variables
 local function on_close()
     -- Remove all placed entities
-    local area = variables.level.area
-    clean_up(area)
+    local level = variables.level
+    if level then clean_up(level.area) end
 
     -- Remake all entities from the template
-    for i, entity in ipairs(save.entities) do
-        local name = entity[1]
-        local position = entity[2]
-        local force = entity[3]
-        local minable = entity[4]
-        local ent = variables["surface"].create_entity {name = name, position = position, force = force}
-        ent.minable = minable
+    if save.entities then
+        for i, entity in ipairs(save.entities) do
+            local name = entity[1]
+            local position = entity[2]
+            local force = entity[3]
+            local minable = entity[4]
+            local ent = variables.surface.create_entity {name = name, position = position, force = force}
+            ent.minable = minable
+        end
     end
 
     -- Reset the global values
