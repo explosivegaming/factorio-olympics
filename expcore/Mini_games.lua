@@ -62,7 +62,7 @@ local function internal_error(error_message)
 end
 
 --- Used to debug mini game control flow
-local DEBUG = true
+local DEBUG = false
 local function dlog(...)
     if not DEBUG then return end
     log{'mini-game-log', primitives.current_game or 'None', primitives.state, table.concat({...}, ' ')}
