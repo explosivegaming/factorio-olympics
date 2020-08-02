@@ -198,14 +198,15 @@ local function on_player_joined(event)
 
     if Mini_games.get_current_state() == 'Starting' then
         if player.character then player.character.destroy() end
-        player.create_character()
+        local pos = get_teleport_location(player.force, true)
+        local character = MS.get_surface().create_entity{name='character', position=pos, force=player.force}
+        player.set_controller{type = defines.controllers.character, character = character}
         game.permissions.get_group('Default').add_player(player)
         for _, item in pairs(starting_items) do
             player.insert(item)
         end
     end
 
-    player.teleport(get_teleport_location(player.force, true), MS.get_surface())
 end
 
 --- Tile map used to produce the two out of map walls
@@ -342,8 +343,6 @@ end
 local function stop()
     local won, player_names = primitives.won, {}
     for index, player in ipairs(game.connected_players) do
-        local gui = player.gui.center['Space-Race']
-        Gui.destroy_if_valid(gui)
         if player.force.name == won then
             player_names[index] = player.name
         end

@@ -24,7 +24,8 @@ function Public.show_gui(event, game_name, current, required)
     title_flow.style.top_padding = 8
     title_flow.style.horizontally_stretchable = false
 
-    local title = title_flow.add {type = 'label', caption = 'Welcome to '..game_name}
+    local name = game_name:gsub('_', ' '):lower():gsub('(%l)(%w+)', function(a,b) return string.upper(a)..b end)
+    local title = title_flow.add {type = 'label', caption = 'Welcome to '..name}
     title.style.font = 'default-large-bold'
 
     --Body

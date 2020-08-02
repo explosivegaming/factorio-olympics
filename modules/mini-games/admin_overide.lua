@@ -3,7 +3,8 @@ local Commands = require 'expcore.commands'
 
 Commands.new_command('stop', 'Command to stop a mini_game.')
 :register(function(_, _)
-    if Mini_games.get_current_game() then Mini_games.stop_game() end
+    local _, rtn = xpcall(Mini_games.stop_game, Commands.error)
+    return rtn
 end)
 
 Commands.new_command('start', 'Command to start a mini_game.')

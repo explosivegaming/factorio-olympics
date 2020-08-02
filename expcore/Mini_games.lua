@@ -218,15 +218,16 @@ end
 function Mini_games.respawn_spectator(player)
     Gui.update_top_flow(player)
     if player.character then player.character.destroy() end
+    player.set_controller{ type = defines.controllers.god }
     if primitives.state == 'Closing' or primitives.state == 'Loading' then
         dlog('Respawn in lobby:', player.name)
         local surface = game.surfaces.nauvis
         local pos = surface.find_non_colliding_position('character', {-35, 55}, 6, 1)
-        player.create_character()
         player.teleport(pos, surface)
+        player.create_character()
     elseif primitives.current_game then
         dlog('Respawn in spectator:', player.name)
-        player.set_controller{ type = defines.controllers.god }
+        player.set_controller{ type = defines.controllers.spectator }
     end
 end
 
@@ -325,7 +326,7 @@ local function check_participant_selector_join(player)
     end
 end
 
---- Used to either remove a participant and pass the player to participant_selector
+--- Used to remove a participant and pass the player to participant_selector
 -- If a participant selector exists then the player is passed to it
 local function check_participant_selector_leave(player)
     check_wait_screen(player)
@@ -514,8 +515,8 @@ function check_participant_count()
     local mini_game = Mini_games.get_current_game()
     local selector = mini_game.participant_selector
 
-    -- If the participants count is less than required, stop load checking, and update wait gui
-    if #participants < primitives.participant_requirement then
+    -- If the participants count is less than required, and there has been less 2 minutes waiting, stop load checking, and update wait gui
+    if #participants < primitives.participant_requirement and game.tick < primitives.start_tick + 7200 then
         WaitingGui.update_gui(#participants, primitives.participant_requirement)
         if primitives.state == 'Waiting' then return end
         primitives.state = 'Waiting'
@@ -543,6 +544,9 @@ function check_participant_count()
 
         return
     end
+
+    -- Check if we are already in loading to prevent extra calls
+    if primitives.state == 'Loading' then return end
 
     -- When requirement is met remove the gui
     dlog('Remove Waiting')
@@ -572,6 +576,9 @@ function check_participant_count()
     end
 
 end
+
+--- Used to trigger a delayed check for the player count, will force waiting to be skipped
+local delayed_player_count_check = Token.register(check_participant_count)
 
 --- Starts a mini game if no other games are running, calls on_init then on_participant_added
 function Mini_games.start_game(name, player_count, args)
@@ -652,6 +659,7 @@ function Mini_games.start_game(name, player_count, args)
     end
 
     -- Check if we are able to start now, if not then this will be checked again with add_participant
+    Task.set_timeout(120, delayed_player_count_check)
     check_participant_count()
 end
 
@@ -683,7 +691,7 @@ end)
 
 --- Stop a mini game, calls on_stop then on_participant_removed
 function Mini_games.stop_game()
-    local mini_game = Mini_games.get_current_game()
+    local mini_game = assert(Mini_games.get_current_game(), 'No mini game is currently running')
     local skip_timeout = primitives.state ~= 'Started'
     Event.remove_removable_nth_tick(60, check_ready)
     primitives.state = 'Stopping'
@@ -691,9 +699,10 @@ function Mini_games.stop_game()
 
     -- Calls on_stop core event to stop the game and to get the data to write to file
     -- on_stop should return an array of position entries which are tables of the
+    -- on_stop is only called if the game was started, it would not make sense to write results to a file when no game was started
     -- following format: { place = integer, score = number, players = array of player names }
     local on_stop = mini_game.core_events.on_stop
-    if on_stop then
+    if not skip_timeout and on_stop then
         dlog('Call: On Stop')
         local success, res = xpcall(on_stop, internal_error)
         if success then
@@ -705,13 +714,18 @@ function Mini_games.stop_game()
         end
     end
 
-    -- Remove all participants from the game, this also places them into spectator
-    dlog('Disable handlers:', mini_game.name)
+    -- Remove all participants from the game, this also places them into spectator, and removes selector if present
+    local selector = mini_game.participant_selector
     for _, player in ipairs(participants) do
         Mini_games.remove_participant(player)
+        if skip_timeout and selector then
+            dlog('Remove selector:', player.name)
+            xpcall(selector, internal_error, player, true)
+        end
     end
 
     -- Disable all events for this mini game
+    dlog('Disable handlers:', mini_game.name)
     for _, event in ipairs(mini_game.events) do
         -- event = { event_name, handler }
         Event.remove_removable(unpack(event))

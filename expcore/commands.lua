@@ -676,6 +676,7 @@ return Commands.error('The player you selected is offline')
 ]]
 function Commands.error(error_message, play_sound)
     error_message = error_message or ''
+    if type(error_message) == 'string' then error_message = error_message:gsub('%.%.%..-/temp/currently%-playing', '') end
     player_return({'expcore-commands.command-fail', error_message}, 'orange_red')
     if play_sound ~= false then
         play_sound = play_sound or 'utility/wire_pickup'
