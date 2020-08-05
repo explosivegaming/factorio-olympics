@@ -2,22 +2,41 @@ local Mini_games = require 'expcore.Mini_games'
 local Global     = require 'utils.global' --Used to prevent desyncing.
 local Gui        = require 'expcore.gui._require'
 
-local targets    = {'Steel Axe', 'Getting on Track', 'Reduced', 'Standard', 'Marathon'}
+local targets    = {}
+local lookups    = {}
 local primitives = {}
 local progress   = {}
 local surfaces   = {}
-local teams      = {}
+local forces     = {}
+
+local goals = require 'config.mini_games.speedrun'
+for index, goal in ipairs(goals) do
+    local lookup = {}
+    lookups[index] = lookup
+    targets[index] = goal.name
+
+    local ctn = goal.rockets or 0
+    for _, key in ipairs{'research', 'items', 'entities'} do
+        local value = goal[key]
+        if value then
+            ctn = ctn + #value
+            for _, name in ipairs(value) do lookup[key..'/'..name] = true end
+        end
+    end
+
+    goal.total = ctn
+end
 
 Global.register({
     primitives = primitives,
     progress   = progress,
     surfaces   = surfaces,
-    teams      = teams
+    forces     = forces
 }, function(tbl)
     primitives = tbl.primitives
     progress   = tbl.progress
     surfaces   = tbl.surfaces
-    teams      = tbl.teams
+    forces     = tbl.forces
 end)
 
 ----- Local Variables ----
@@ -41,6 +60,7 @@ local function reset_globals()
     reset_table(primitives)
     reset_table(progress)
     reset_table(surfaces)
+    reset_table(surfaces)
 end
 
 ----- Game Init and Start -----
@@ -50,19 +70,21 @@ local function init(args)
     local target = tonumber(args[1])
     if not target or target < 1 or target > #targets then Mini_games.error_in_game('Target index out of range') end
     primitives.target = target
+    primitives.lookup = lookups[target]
 
     local team_count = tonumber(args[2])
     if not team_count or team_count < 1 then Mini_games.error_in_game('Team count is invalid') end
     primitives.team_count = team_count
 
-    local seed = math.random(9999999999)
     -- Create a surface for each team with the same seed and settings
+    local seed, indicators = math.random(9999999999), goals[target]
     for i = 1, team_count do
         local name = 'SpeedrunTeam'..i
+        forces[name] = game.create_force(name)
+        forces[name].share_chart = true
         surfaces[name] = game.create_surface(name, { seed=seed })
         surfaces[name].request_to_generate_chunks({0, 0}, 5)
-        progress[name] = 0
-        teams[name] = {}
+        progress[name] = { 0, indicators.total, table.deep_copy(indicators) }
     end
 end
 
@@ -83,8 +105,8 @@ local function stop()
     for name, team_progress in pairs(progress) do
         ctn = ctn + 1
         local names = {}
-        for index, player in ipairs(teams[name]) do names[index] = player.name end
-        scores[ctn] = { name, team_progress, names }
+        for index, player in ipairs(forces[name].players) do names[index] = player.name end
+        scores[ctn] = { name, team_progress[1], names }
     end
 
     -- Sort by team progress
@@ -116,30 +138,22 @@ end
 -- Adds the player to the team with lowest player count
 local function on_player_added(event)
     local player = game.players[event.player_index]
-    local min_name, min_ctn = nil, 0
-    for name, players in pairs(teams) do
-        if not min_name or min_ctn > #players then
-            min_name, min_ctn = name, #players
+    local min_force, min_ctn = nil, 0
+    for _, force in pairs(forces) do
+        local player_ctn = #force.players
+        if not min_force or min_ctn > player_ctn then
+            min_force, min_ctn = force, player_ctn
         end
     end
 
-    teams[min_name][min_ctn+1] = player
+    player.force = min_force
 end
 
 --- Trigger when a participant is removed from the game
 -- Removes the player from the team arrays
 local function on_player_removed(event)
-    local player_index = event.player_index
-    for _, players in pairs(teams) do
-        for index, player in ipairs(players) do
-            if player.index == player_index then
-                local len = #players
-                players[index] = players[len]
-                players[len] = nil
-                return
-            end
-        end
-    end
+    local player = game.players[event.player_index]
+    player.force = game.forces.player
 end
 
 --- Trigger when a participant joins the game
@@ -147,14 +161,7 @@ local function on_player_joined(event)
     local player = game.players[event.player_index]
 
     if Mini_games.get_current_state() == 'Starting' then
-        local surface -- Find the correct surface to teleport to
-        for name, players in pairs(teams) do
-            for index, next_player in ipairs(players) do
-                if next_player.name == player.name then
-                    surface = surfaces[name]
-                end
-            end
-        end
+        local surface = surfaces[player.force.name]
 
         -- Teleport the player to the new surface
         if player.character then player.character.destroy() end
@@ -174,6 +181,77 @@ local function on_player_joined(event)
 end
 
 ----- Events -----
+
+--- Used to update guis and end the game
+local function update_progress(force, data)
+    -- todo update player guis
+    game.print(string.format('%s %d/%d', force.name, data[1], data[2]))
+    if data[1] == data[2] then Mini_games.stop_game() end
+end
+
+--- Checks if an indicator has already been used
+local function check_indicator(force, key, value)
+    local data = progress[force.name]
+    local indicators = data[3][key]
+    for index, next_value in ipairs(indicators) do
+        if next_value == value then
+            local last = #indicators
+            indicators[index] = indicators[last]
+            indicators[last] = nil
+            data[1] = data[1] + 1
+            return update_progress(force, data)
+        end
+    end
+end
+
+--- Triggered when a research is completed
+local function on_research_completed(event)
+    local research = event.research.name
+    if not primitives.lookup['research/'..research] then return end
+
+    local force = event.research.force
+    check_indicator(force, 'research', research)
+end
+
+--- Triggered when an entity is placed
+local function on_entity_placed(event)
+    local entity = event.created_entity.name
+    if not primitives.lookup['entities/'..entity] then return end
+
+    local force = event.created_entity.force
+    check_indicator(force, 'entities', entity)
+end
+
+--- Triggered when an item is crafted
+local function on_item_crafted(event)
+    local item = event.item_stack.prototype.name
+    if not primitives.lookup['items/'..item] then return end
+
+    local force = game.players[event.player_index].force
+    check_indicator(force, 'items', item)
+end
+
+--- Triggered when an item is dropped, backup method to trigger if item was not hand crafted
+-- todo look into using production stats as an alternative
+local function on_item_dropped(event)
+    local item = event.entity.stack.name
+    if not primitives.lookup['items/'..item] then return end
+
+    local force = game.players[event.player_index].force
+    check_indicator(force, 'items', item)
+end
+
+--- Triggered when a rocket is launched
+local function on_rocket_launched(event)
+    local force = event.rocket_silo.force
+    local data = progress[force.name]
+    local rockets = data[3].rockets
+    if rockets and rockets > 0 then
+        data[3].rockets = rockets - 1
+        data[1] = data[1] + 1
+        update_progress(force, data)
+    end
+end
 
 ----- Gui Elements -----
 
@@ -230,3 +308,10 @@ Speedrun:add_option(2) -- how many options are needed with /start
 Speedrun:add_event(Mini_games.events.on_participant_added, on_player_added)
 Speedrun:add_event(Mini_games.events.on_participant_joined, on_player_joined)
 Speedrun:add_event(Mini_games.events.on_participant_removed, on_player_removed)
+
+Speedrun:add_event(defines.events.on_research_finished, on_research_completed)
+Speedrun:add_event(defines.events.on_built_entity, on_entity_placed)
+Speedrun:add_event(defines.events.on_robot_built_entity, on_entity_placed)
+Speedrun:add_event(defines.events.on_player_crafted_item, on_item_crafted)
+Speedrun:add_event(defines.events.on_player_dropped_item, on_item_dropped)
+Speedrun:add_event(defines.events.on_rocket_launched, on_rocket_launched)
