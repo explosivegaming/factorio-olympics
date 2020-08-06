@@ -141,7 +141,7 @@ local function close()
 
     -- Clear and hide the gui for all players
     for _, player in pairs(game.players) do
-        Gui.toggle_left_element(player, timer_container, true)
+        Gui.toggle_left_element(player, timer_container, false)
         local container = Gui.get_left_element(player, timer_container)
         container.progress_table.clear()
     end
@@ -276,6 +276,18 @@ local function on_rocket_launched(event)
         data[3].rockets = rockets - 1
         data[1] = data[1] + 1
         update_progress(force, data)
+    end
+end
+
+--- Ran every tick to update the timer
+local options = { hours = true, minutes = true, seconds = true, milliseconds = true, time = true, div = 'time-format.simple-format-div-space' }
+local format_time = _C.format_time
+local function on_tick()
+    local time = game.tick - Mini_games.get_start_time()
+    local format = format_time(time, options)
+    for _, player in ipairs(game.connected_players) do
+        local container = Gui.get_left_element(player, timer_container)
+        container.timer.caption = format
     end
 end
 
@@ -449,3 +461,4 @@ Speedrun:add_event(defines.events.on_robot_built_entity, on_entity_placed)
 Speedrun:add_event(defines.events.on_player_crafted_item, on_item_crafted)
 Speedrun:add_event(defines.events.on_player_dropped_item, on_item_dropped)
 Speedrun:add_event(defines.events.on_rocket_launched, on_rocket_launched)
+Speedrun:add_event(defines.events.on_tick, on_tick)

@@ -8,6 +8,8 @@ local Colours = require 'utils.color_presets' --- @dep utils.color_presets
 local Game = require 'utils.game' --- @dep utils.game
 local Util = require 'util' --- @dep util
 
+local floor = math.floor
+local format = string.format
 local Common = {}
 
 --- Type Checking.
@@ -99,9 +101,9 @@ function Common.validate_argument_type(value, test_type, param_number, param_nam
         local function_name = debug.getinfo(2, 'n').name or '<anon>'
         local error_message
         if param_name then
-            error_message = string.format('Bad argument #%d to %q; %q is of type %s expected %s', param_number, function_name, param_name, type(value), test_type)
+            error_message = format('Bad argument #%d to %q; %q is of type %s expected %s', param_number, function_name, param_name, type(value), test_type)
         else
-            error_message = string.format('Bad argument #%d to %q; argument is of type %s expected %s', param_number, function_name, type(value), test_type)
+            error_message = format('Bad argument #%d to %q; argument is of type %s expected %s', param_number, function_name, type(value), test_type)
         end
         return error(error_message, 3)
     end
@@ -127,9 +129,9 @@ function Common.validate_argument_multi_type(value, test_types, param_number, pa
         local function_name = debug.getinfo(2, 'n').name or '<anon>'
         local error_message
         if param_name then
-            error_message = string.format('Bad argument #%2d to %q; %q is of type %s expected %s', param_number, function_name, param_name, type(value), table.concat(test_types, ' or '))
+            error_message = format('Bad argument #%2d to %q; %q is of type %s expected %s', param_number, function_name, param_name, type(value), table.concat(test_types, ' or '))
         else
-            error_message = string.format('Bad argument #%2d to %q; argument is of type %s expected %s', param_number, function_name, type(value), table.concat(test_types, ' or '))
+            error_message = format('Bad argument #%2d to %q; argument is of type %s expected %s', param_number, function_name, type(value), table.concat(test_types, ' or '))
         end
         return error(error_message, 3)
     end
@@ -344,7 +346,7 @@ local message = format_chat_colour('Hello, World!', { r=355, g=100, b=100 })
 function Common.format_chat_colour(message, color)
     color = color or Colours.white
     local color_tag = '[color='..math.round(color.r, 3)..', '..math.round(color.g, 3)..', '..math.round(color.b, 3)..']'
-    return string.format('%s%s[/color]', color_tag, message)
+    return format('%s%s[/color]', color_tag, message)
 end
 
 --[[-- Returns a message with valid chat tags to change its colour, using localization
@@ -431,6 +433,24 @@ function Common.player_return(value, colour, player)
     else rcon.print(returnAsString) end
 end
 
+--- The default options used with time format
+local format_time_default_options = {
+    -- Denominations
+    days         = false,
+    hours        = true,
+    minutes      = true,
+    seconds      = false,
+    milliseconds = false,
+    -- Presets
+    long = false,
+    time = false,
+    null = false,
+    -- Formatting
+    string = false,
+    suffix = nil,
+    div    = nil
+}
+
 --[[-- Formats tick into a clean format, denominations from highest to lowest
 -- time will use : separates
 -- when a denomination is false it will overflow into the next one
@@ -452,84 +472,78 @@ local time = format_time(18000, { hours=true, minutes=true, seconds=true, string
 
 ]]
 function Common.format_time(ticks, options)
-    -- Sets up the options
-    options = options or {
-        days=false,
-        hours=true,
-        minutes=true,
-        seconds=false,
-        long=false,
-        time=false,
-        string=false,
-        null=false
-    }
+    options = options or format_time_default_options
     -- Basic numbers that are used in calculations
     local max_days, max_hours, max_minutes, max_seconds = ticks/5184000, ticks/216000, ticks/3600, ticks/60
-    local days, hours = max_days, max_hours-math.floor(max_days)*24
-    local minutes, seconds = max_minutes-math.floor(max_hours)*60, max_seconds-math.floor(max_minutes)*60
+    local days,    hours   = max_days,                        max_hours-floor(max_days)*24
+    local minutes, seconds = max_minutes-floor(max_hours)*60, max_seconds-floor(max_minutes)*60
+
     -- Handles overflow of disabled denominations
-    local rtn_days, rtn_hours, rtn_minutes, rtn_seconds = math.floor(days), math.floor(hours), math.floor(minutes), math.floor(seconds)
-    if not options.days then
-        rtn_hours = rtn_hours + rtn_days*24
+    local rtn_days, rtn_hours, rtn_minutes, rtn_seconds = floor(days), floor(hours), floor(minutes), floor(seconds)
+    if options.milliseconds then rtn_seconds = floor(seconds*1000)/1000 end
+    if not options.days     then rtn_hours   = rtn_hours   + rtn_days*24 end
+    if not options.hours    then rtn_minutes = rtn_minutes + rtn_hours*60 end
+    if not options.minutes  then rtn_seconds = rtn_seconds + rtn_minutes*60 end
+
+    -- Creates the null time format
+    if options.null then
+        local null = options.null == true and '--' or options.null
+        rtn_days, rtn_hours, rtn_minutes, rtn_seconds = null, null, null, null
     end
-    if not options.hours then
-        rtn_minutes = rtn_minutes + rtn_hours*60
-    end
-    if not options.minutes then
-        rtn_seconds = rtn_seconds + rtn_minutes*60
-    end
-    -- Creates the null time format, does not work with long
-    if options.null and not options.long then
-        rtn_days='--'
-        rtn_hours='--'
-        rtn_minutes='--'
-        rtn_seconds='--'
-    end
+
     -- Format options
-    local suffix = 'time-symbol-'
-    local suffix_2 = '-short'
-    if options.long then
-        suffix = ''
-        suffix_2 = ''
-    end
+    local suffix, suffix_2 = 'time-symbol-', '-short'
+    if options.long then suffix, suffix_2 = '', '' end
+
     local div = options.string and ' ' or 'time-format.simple-format-tagged'
     if options.time then
         div = options.string and ':' or 'time-format.simple-format-div'
         suffix = false
     end
+
+    if options.div ~= nil then div = options.div end
+    if options.suffix ~= nil then suffix = options.suffix end
+
     -- Adds formatting
-    if suffix ~= false then
+    if suffix then
+        -- If there is a suffix then it is added here
         if options.string then
-            -- format it as a string
             local long = suffix == ''
-            rtn_days = long and rtn_days..' days' or rtn_days..'d'
-            rtn_hours = long and rtn_hours..' hours' or rtn_hours..'h'
+            rtn_days    = long and rtn_days..' days'       or rtn_days..'d'
+            rtn_hours   = long and rtn_hours..' hours'     or rtn_hours..'h'
             rtn_minutes = long and rtn_minutes..' minutes' or rtn_minutes..'m'
             rtn_seconds = long and rtn_seconds..' seconds' or rtn_seconds..'s'
         else
-            rtn_days = {suffix..'days'..suffix_2, rtn_days}
-            rtn_hours = {suffix..'hours'..suffix_2, rtn_hours}
+            rtn_days    = {suffix..'days'..suffix_2, rtn_days}
+            rtn_hours   = {suffix..'hours'..suffix_2, rtn_hours}
             rtn_minutes = {suffix..'minutes'..suffix_2, rtn_minutes}
             rtn_seconds = {suffix..'seconds'..suffix_2, rtn_seconds}
         end
+
     elseif not options.null then
-        -- weather string or not it has same format
-        rtn_days = string.format('%02d', rtn_days)
-        rtn_hours = string.format('%02d', rtn_hours)
-        rtn_minutes = string.format('%02d', rtn_minutes)
-        rtn_seconds = string.format('%02d', rtn_seconds)
+        -- If there is no suffix then we just add padding
+        rtn_days = format('%02d', rtn_days)
+        rtn_hours = format('%02d', rtn_hours)
+        rtn_minutes = format('%02d', rtn_minutes)
+        if options.milliseconds then
+            rtn_seconds = format('%06.3f', rtn_seconds)
+        else
+            rtn_seconds = format('%02d', rtn_seconds)
+        end
     end
+
     -- The final return is construed
     local rtn
-    local append = function(dom, value)
+    local function append(dom, value)
         if dom and options.string then
             rtn = rtn and rtn..div..value or value
         elseif dom then
             rtn = rtn and {div, rtn, value} or value
         end
     end
-    append(options.days, rtn_days)
-    append(options.hours, rtn_hours)
+
+    append(options.days,    rtn_days)
+    append(options.hours,   rtn_hours)
     append(options.minutes, rtn_minutes)
     append(options.seconds, rtn_seconds)
     return rtn
@@ -588,7 +602,7 @@ function Common.move_items(items, surface, position, radius, chest_type)
     local last_chest
     for item_name, item_count in pairs(items) do
         local chest = next_chest{name=item_name, count=item_count}
-        if not chest then return error(string.format('Cant move item %s to %s{%s, %s} no valid chest in radius', item_name, surface.name, p.x, p.y)) end
+        if not chest then return error(format('Cant move item %s to %s{%s, %s} no valid chest in radius', item_name, surface.name, p.x, p.y)) end
         Util.insert_safe(chest, {[item_name]=item_count})
         last_chest = chest
     end
@@ -629,7 +643,7 @@ function Common.print_grid_value(value, surface, position, scale, offset, immuta
         color = { r = r, g = g, b = b}
 
         -- round at precision of 2
-        text = math.floor(100 * value) * 0.01
+        text = floor(100 * value) * 0.01
 
         if (0 == text) then
             text = '0.00'
