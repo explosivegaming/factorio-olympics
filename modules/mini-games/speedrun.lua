@@ -66,6 +66,7 @@ end
 ----- Game Init and Start -----
 
 --- First function called by the mini game core to prepare for the start of a game
+local team_entry, timer_container
 local function init(args)
     local target = tonumber(args[1])
     if not target or target < 1 or target > #targets then Mini_games.error_in_game('Target index out of range') end
@@ -77,7 +78,7 @@ local function init(args)
     primitives.team_count = team_count
 
     -- Create a surface for each team with the same seed and settings
-    local seed, indicators = math.random(9999999999), goals[target]
+    local seed, indicators = math.random(4294967295), goals[target]
     for i = 1, team_count do
         local name = 'SpeedrunTeam'..i
         forces[name] = game.create_force(name)
@@ -86,13 +87,22 @@ local function init(args)
         surfaces[name].request_to_generate_chunks({0, 0}, 5)
         progress[name] = { 0, indicators.total, table.deep_copy(indicators) }
     end
+
 end
 
 --- Called once enough participants are present to start the game and map generation is done
 local function start()
-    local force = game.forces.player
-    for _, surface in pairs(surfaces) do
-        force.chart(surface, {{x = 64, y = 64}, {x = -64, y = -64}})
+    -- Chart the start area for all teams
+    for name, force in pairs(forces) do
+        force.chart(surfaces[name], {{x = 64, y = 64}, {x = -64, y = -64}})
+    end
+
+    -- Added all the teams to the progress table
+    for _, player in pairs(game.players) do
+        Gui.toggle_left_element(player, timer_container, true)
+        local container = Gui.get_left_element(player, timer_container)
+        local progress_table = container.progress_table
+        for name in pairs(forces) do team_entry(progress_table, name) end
     end
 end
 
@@ -102,11 +112,11 @@ end
 local function stop()
     local scores, ctn = {}, 0
     -- Get all the data needed to write results
-    for name, team_progress in pairs(progress) do
+    for name, team in pairs(progress) do
         ctn = ctn + 1
         local names = {}
         for index, player in ipairs(forces[name].players) do names[index] = player.name end
-        scores[ctn] = { name, team_progress[1], names }
+        scores[ctn] = { name, math.floor(team[1]/team[2]*1000)/1000, names }
     end
 
     -- Sort by team progress
@@ -127,6 +137,13 @@ end
 local function close()
     for _, surface in pairs(surfaces) do
         game.delete_surface(surface)
+    end
+
+    -- Clear and hide the gui for all players
+    for _, player in pairs(game.players) do
+        Gui.toggle_left_element(player, timer_container, true)
+        local container = Gui.get_left_element(player, timer_container)
+        container.progress_table.clear()
     end
 
     reset_globals()
@@ -184,8 +201,17 @@ end
 
 --- Used to update guis and end the game
 local function update_progress(force, data)
-    -- todo update player guis
-    game.print(string.format('%s %d/%d', force.name, data[1], data[2]))
+    local name = force.name
+    local bar_name, bar_value = 'bar-'..name, data[1]/data[2]
+    local label_name, label_value = 'label-'..name, math.floor(bar_value*100)..'%'
+    local label_tooltip = 'Progress: '..data[1]..' / '..data[2]
+    for _, player in pairs(game.players) do
+        local container = Gui.get_left_element(player, timer_container)
+        local progress_table = container.progress_table
+        progress_table[bar_name].value = bar_value
+        progress_table[label_name].caption = label_value
+        progress_table[label_name].tooltip = label_tooltip
+    end
     if data[1] == data[2] then Mini_games.stop_game() end
 end
 
@@ -254,6 +280,114 @@ local function on_rocket_launched(event)
 end
 
 ----- Gui Elements -----
+
+--- Adds a team to the progress table
+-- @element team_entry
+team_entry =
+Gui.element(function(event_trigger, parent, team_name)
+    local clean_name = team_name:sub(9):gsub('(%a)([%u%d])', function(a,b) return a..' '..b end)
+    local data = progress[team_name]
+
+    -- Flow to contain the label
+    local flow = parent.add{
+        type = 'flow',
+        name = 'name-'..team_name,
+        caption = team_name
+    }
+
+    -- Get the player names
+    local names = {}
+    for index, player in ipairs(forces[team_name].players) do names[index] = player.name end
+
+    -- Add the team name label
+    flow.add{
+        type = 'label',
+        name = event_trigger,
+        caption = clean_name,
+        tooltip = table.concat(names, ',\n'),
+        style = 'caption_label'
+    }
+
+    -- Add the progress bar
+    parent.add{
+        type = 'progressbar',
+        name = 'bar-'..team_name,
+        tooltip = 'Team Progress',
+        value = data[1]/data[2],
+    }.style.horizontally_stretchable = true
+
+    -- Add the progress caption
+    parent.add{
+        type = 'label',
+        name = 'label-'..team_name,
+        caption = math.floor(data[1]/data[2]*100),
+        tooltip = 'Progress: '..data[1]..' / '..data[2],
+        style = 'caption_label'
+    }
+
+end)
+:on_click(function(player, element)
+    --if Mini_games.is_participant(player) then return end
+    local surface = surfaces[element.parent.caption]
+    player.teleport({0,0}, surface)
+end)
+
+--- Main container for the timer
+-- @element timer_container
+timer_container =
+Gui.element(function(event_trigger, parent)
+    -- Draw the main container
+    local container = parent.add{
+        type = 'frame',
+        style = 'blurry_frame',
+        name = event_trigger,
+        direction = 'vertical'
+    }
+
+    -- Draw the main time label
+    local label_style = container.add{
+        type = 'label',
+        name = 'timer',
+        caption = '00 : 00 : 00.000',
+        style = 'heading_1_label'
+    }.style
+
+    -- Center the label
+    label_style.horizontal_align = 'center'
+    label_style.width = 200
+
+    -- Add a dividing bar
+    Gui.bar(container, 200)
+
+    -- Draw the progress table
+    local progress_table = container.add{
+        type = 'table',
+        name = 'progress_table',
+        column_count = 3
+    }
+
+    -- Set the style of the table
+    local table_Style = progress_table.style
+    table_Style.padding = {5,0,0,0}
+    table_Style.cell_padding = 0
+    table_Style.vertical_align = 'center'
+    table_Style.horizontally_stretchable = true
+
+    -- Add the teams if the game has started
+    if Mini_games.get_current_state() == 'Stared' then
+        for name in pairs(forces) do team_entry(progress_table, name) end
+    end
+
+    -- Return the main container
+    return container
+end)
+:add_to_left_flow()
+
+--- Button on the top flow used to toggle the player list container
+-- @element toggle_left_element
+Gui.left_toolbar_button('utility/clock', 'Speed Run Timer', timer_container, function()
+    return Mini_games.get_running_game() == 'Speedrun'
+end)
 
 --- Used to select what type of fuel to use
 -- @element fuel_dropdown

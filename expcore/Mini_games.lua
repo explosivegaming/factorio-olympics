@@ -441,6 +441,7 @@ local start_game = Token.register(function(timeout_nonce)
     local surfaces, selector, surface = mini_game.surface_names, mini_game.participant_selector, nil
     if #surfaces == 1 then surface = surfaces[1] end
     for _, player in ipairs(game.connected_players) do
+        Gui.toggle_top_flow(player, false)
         Mini_games.respawn_spectator(player)
         if surface then player.teleport({0,0}, surface) end
         if selector then

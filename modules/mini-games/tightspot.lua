@@ -734,7 +734,7 @@ end)
 :add_to_left_flow(false)
 
 --- Add a toolbar button to toggle the main gui
-Gui.left_toolbar_button("item/coin", "money", game_gui, function(player)
+Gui.left_toolbar_button("item/coin", "Tight Spot", game_gui, function(player)
     return Mini_games.is_participant(player) and Mini_games.get_running_game() == "Tight_spot"
 end)
 
