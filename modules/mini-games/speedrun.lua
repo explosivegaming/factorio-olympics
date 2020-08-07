@@ -16,10 +16,12 @@ for index, goal in ipairs(goals) do
     targets[index] = goal.name
 
     local ctn = goal.rockets or 0
+    lookup.rockets = goal.rockets and goal.rockets > 0
     for _, key in ipairs{'research', 'items', 'entities'} do
         local value = goal[key]
         if value then
             ctn = ctn + #value
+            lookup[key] = true
             for _, name in ipairs(value) do lookup[key..'/'..name] = true end
         end
     end
@@ -94,14 +96,16 @@ end
 local function start()
     -- Chart the start area for all teams
     for name, force in pairs(forces) do
-        force.chart(surfaces[name], {{x = 64, y = 64}, {x = -64, y = -64}})
+        force.chart(surfaces[name], {{x = 80, y = 80}, {x = -80, y = -80}})
     end
 
     -- Added all the teams to the progress table
+    local tooltip = goals[primitives.target].goal
     for _, player in pairs(game.players) do
         Gui.toggle_left_element(player, timer_container, true)
         local container = Gui.get_left_element(player, timer_container)
         local progress_table = container.progress_table
+        container.timer.tooltip = tooltip
         for name in pairs(forces) do team_entry(progress_table, name) end
     end
 end
@@ -135,8 +139,14 @@ end
 
 --- Final function called by the mini game core in order to clean up
 local function close()
+    -- Remove the surfaces
     for _, surface in pairs(surfaces) do
         game.delete_surface(surface)
+    end
+
+    -- Remove the forces
+    for _, force in pairs(forces) do
+        game.merge_forces(force, game.forces.player)
     end
 
     -- Clear and hide the gui for all players
@@ -203,12 +213,14 @@ end
 local function update_progress(force, data)
     local name = force.name
     local bar_name, bar_value = 'bar-'..name, data[1]/data[2]
+    local bar_tooltip = {'', 'Last Completed: ', data[4] or 'None'}
     local label_name, label_value = 'label-'..name, math.floor(bar_value*100)..'%'
     local label_tooltip = 'Progress: '..data[1]..' / '..data[2]
     for _, player in pairs(game.players) do
         local container = Gui.get_left_element(player, timer_container)
         local progress_table = container.progress_table
         progress_table[bar_name].value = bar_value
+        progress_table[bar_name].tooltip = bar_tooltip
         progress_table[label_name].caption = label_value
         progress_table[label_name].tooltip = label_tooltip
     end
@@ -216,7 +228,7 @@ local function update_progress(force, data)
 end
 
 --- Checks if an indicator has already been used
-local function check_indicator(force, key, value)
+local function check_indicator(force, key, clean, locale, value)
     local data = progress[force.name]
     local indicators = data[3][key]
     for index, next_value in ipairs(indicators) do
@@ -225,6 +237,7 @@ local function check_indicator(force, key, value)
             indicators[index] = indicators[last]
             indicators[last] = nil
             data[1] = data[1] + 1
+            data[4] = {'', clean, locale}
             return update_progress(force, data)
         end
     end
@@ -232,39 +245,29 @@ end
 
 --- Triggered when a research is completed
 local function on_research_completed(event)
-    local research = event.research.name
-    if not primitives.lookup['research/'..research] then return end
+    local research = event.research
+    if not primitives.lookup['research/'..research.name] then return end
 
     local force = event.research.force
-    check_indicator(force, 'research', research)
+    check_indicator(force, 'research', 'Research - ', research.localised_name, research.name)
 end
 
 --- Triggered when an entity is placed
 local function on_entity_placed(event)
-    local entity = event.created_entity.name
-    if not primitives.lookup['entities/'..entity] then return end
+    local entity = event.created_entity
+    if not primitives.lookup['entities/'..entity.name] then return end
 
     local force = event.created_entity.force
-    check_indicator(force, 'entities', entity)
+    check_indicator(force, 'entities', 'Entity - ', entity.localised_name, entity.name)
 end
 
 --- Triggered when an item is crafted
 local function on_item_crafted(event)
-    local item = event.item_stack.prototype.name
-    if not primitives.lookup['items/'..item] then return end
+    local item = event.item_stack.prototype
+    if not primitives.lookup['items/'..item.name] then return end
 
     local force = game.players[event.player_index].force
-    check_indicator(force, 'items', item)
-end
-
---- Triggered when an item is dropped, backup method to trigger if item was not hand crafted
--- todo look into using production stats as an alternative
-local function on_item_dropped(event)
-    local item = event.entity.stack.name
-    if not primitives.lookup['items/'..item] then return end
-
-    local force = game.players[event.player_index].force
-    check_indicator(force, 'items', item)
+    check_indicator(force, 'items', 'Item - ', item.localised_name, item.name)
 end
 
 --- Triggered when a rocket is launched
@@ -275,8 +278,41 @@ local function on_rocket_launched(event)
     if rockets and rockets > 0 then
         data[3].rockets = rockets - 1
         data[1] = data[1] + 1
+        data[4] = {'', 'Entity - ', {'entity-name.rocket'}}
         update_progress(force, data)
     end
+end
+
+--- Used to check the item productions for each team
+local function check_item_production()
+    if not primitives.lookup['items'] then return end
+
+    local prototypes = game.item_prototypes
+    for _, force in pairs(forces) do
+        local found = {}
+        local data  = progress[force.name]
+        local items = data[3].items
+        local get_production = force.item_production_statistics.get_input_count
+        -- Find if any required items have been crafted
+        for index, item in ipairs(items) do
+            if get_production(item) > 0 then
+                data[1] = data[1] + 1
+                data[4] = {'', 'Item - ', prototypes[item].localised_name}
+                found[#found+1] = index
+            end
+        end
+        -- Remove items from the list once they have been made
+        if #found > 0 then
+            local last_index = #items + 1
+            for offset, index in ipairs(found) do
+                local last = last_index - offset
+                items[index] = items[last]
+                items[last] = nil
+            end
+            update_progress(force, data)
+        end
+    end
+
 end
 
 --- Ran every tick to update the timer
@@ -324,7 +360,7 @@ Gui.element(function(event_trigger, parent, team_name)
     parent.add{
         type = 'progressbar',
         name = 'bar-'..team_name,
-        tooltip = 'Team Progress',
+        tooltip = 'Last Completed: None',
         value = data[1]/data[2],
     }.style.horizontally_stretchable = true
 
@@ -459,6 +495,6 @@ Speedrun:add_event(defines.events.on_research_finished, on_research_completed)
 Speedrun:add_event(defines.events.on_built_entity, on_entity_placed)
 Speedrun:add_event(defines.events.on_robot_built_entity, on_entity_placed)
 Speedrun:add_event(defines.events.on_player_crafted_item, on_item_crafted)
-Speedrun:add_event(defines.events.on_player_dropped_item, on_item_dropped)
 Speedrun:add_event(defines.events.on_rocket_launched, on_rocket_launched)
 Speedrun:add_event(defines.events.on_tick, on_tick)
+Speedrun:add_nth_tick(60, check_item_production)
