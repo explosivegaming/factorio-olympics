@@ -7,6 +7,7 @@ local MS = require 'utils.map_gen.minigame_surface'
 local Mini_games = require "expcore.Mini_games"
 local Gui = require 'expcore.gui'
 local Commands = require 'expcore.commands'
+local TeamSelector = require 'modules.gui.mini_game_team_selector'
 
 --- Feature Requires
 local Retailer = require 'modules.mini-games.space_race.retailer'
@@ -14,7 +15,6 @@ local Market_Items = require 'modules.mini-games.space_race.market_items'
 local config = require 'config.mini_games.space_race'
 
 --- Gui and map gen requires
-local join_gui = require 'modules.mini-games.space_race.join_gui'
 local cliff = require 'modules.mini-games.space_race.cliff_generator'
 local market_events = require 'modules.mini-games.space_race.market_handler'
 local uranium_gen = require('modules.mini-games.space_race.map_gen.uranium_island')
@@ -181,16 +181,6 @@ local function on_init(args)
     end
 end
 
---- Show the join team gui when wanting to select participants
-local function participant_selector(player, remove_selector)
-    if remove_selector then
-        Gui.destroy_if_valid(player.gui.center['Space-Race'])
-        Mini_games.show_waiting_screen(player)
-    else
-        join_gui.show_gui{ player_index = player.index }
-    end
-end
-
 --- When a player joins teleport them to there base, if start of game then give them a character
 local get_teleport_location
 local function on_player_joined(event)
@@ -296,42 +286,6 @@ local function ready_condition()
     return check_tile_type(surface, 388.5, 0,  'landfill')   and check_tile_type(surface, -388, 0,  'landfill')
        and check_tile_type(surface, 388,   60, 'out-of-map') and check_tile_type(surface, -388, 60, 'out-of-map')
        and check_tile_type(surface, 479,   0,  'water')      and check_tile_type(surface, -479, 0,  'water')
-end
-
---- Make a player join team usa
-function Public.join_usa(player)
-    local force_USA = primitives.force_USA
-
-    local force = player.force
-    if force == force_USA then
-        player.print('[color=red]Failed to join [/color][color=yellow]'..force_USA.name..',[/color][color=red] you are already part of this team![/color]')
-        return false
-    end
-
-    player.force = force_USA
-    player.print('[color=green]You have joined '..force_USA.name..'![/color]')
-    Mini_games.show_waiting_screen(player)
-    Mini_games.add_participant(player)
-    Public.update_gui()
-    return true
-end
-
---- Make a player join team ussr
-function Public.join_ussr(player)
-    local force_USSR = primitives.force_USSR
-
-    local force = player.force
-    if force == force_USSR then
-        player.print('[color=red]Failed to join [/color][color=yellow]'..force_USSR.name..',[/color][color=red] you are already part of this team![/color]')
-        return false
-    end
-
-    player.force = force_USSR
-    player.print('[color=green]You have joined '..force_USSR.name..'![/color]')
-    Mini_games.show_waiting_screen(player)
-    Mini_games.add_participant(player)
-    Public.update_gui()
-    return true
 end
 
 ----- Game Stop -----
@@ -588,7 +542,7 @@ local space_race = Mini_games.new_game("Space_Race")
 space_race:set_core_events(on_init, start, stop, on_close)
 space_race:add_map_gen('Space_Race', 'modules.mini-games.space_race.map_gen.map')
 space_race:set_ready_condition(ready_condition)
-space_race:set_participant_selector(participant_selector, true)
+space_race:set_participant_selector(TeamSelector.selector(function() return {primitives.force_USA, primitives.force_USSR} end), true)
 space_race:set_gui(main_gui, gui_callback)
 space_race:add_option(3)
 

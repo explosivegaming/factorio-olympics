@@ -1,6 +1,7 @@
-local Mini_games = require 'expcore.Mini_games'
-local Global     = require 'utils.global' --Used to prevent desyncing.
-local Gui        = require 'expcore.gui._require'
+local Mini_games   = require 'expcore.Mini_games'
+local Global       = require 'utils.global'
+local Gui          = require 'expcore.gui._require'
+local TeamSelector = require 'modules.gui.mini_game_team_selector'
 
 local targets    = {}
 local lookups    = {}
@@ -82,7 +83,7 @@ local function init(args)
     -- Create a surface for each team with the same seed and settings
     local seed, indicators = math.random(4294967295), goals[target]
     for i = 1, team_count do
-        local name = 'SpeedrunTeam'..i
+        local name = 'Team '..i
         forces[name] = game.create_force(name)
         forces[name].share_chart = true
         surfaces[name] = game.create_surface(name, { seed=seed })
@@ -160,21 +161,6 @@ local function close()
 end
 
 ----- Player Events -----
-
---- Trigger when a participant is added to the game
--- Adds the player to the team with lowest player count
-local function on_player_added(event)
-    local player = game.players[event.player_index]
-    local min_force, min_ctn = nil, 0
-    for _, force in pairs(forces) do
-        local player_ctn = #force.players
-        if not min_force or min_ctn > player_ctn then
-            min_force, min_ctn = force, player_ctn
-        end
-    end
-
-    player.force = min_force
-end
 
 --- Trigger when a participant is removed from the game
 -- Removes the player from the team arrays
@@ -333,7 +319,6 @@ end
 -- @element team_entry
 team_entry =
 Gui.element(function(event_trigger, parent, team_name)
-    local clean_name = team_name:sub(9):gsub('(%a)([%u%d])', function(a,b) return a..' '..b end)
     local data = progress[team_name]
 
     -- Flow to contain the label
@@ -351,7 +336,7 @@ Gui.element(function(event_trigger, parent, team_name)
     flow.add{
         type = 'label',
         name = event_trigger,
-        caption = clean_name,
+        caption = team_name,
         tooltip = table.concat(names, ',\n'),
         style = 'caption_label'
     }
@@ -484,10 +469,10 @@ end
 --- Register the mini game to the mini game module
 local Speedrun = Mini_games.new_game('Speedrun')
 Speedrun:set_core_events(init, start, stop, close)
+Speedrun:set_participant_selector(TeamSelector.selector(function() return forces end), true)
 Speedrun:set_gui(main_gui, gui_callback)
 Speedrun:add_option(2) -- how many options are needed with /start
 
-Speedrun:add_event(Mini_games.events.on_participant_added, on_player_added)
 Speedrun:add_event(Mini_games.events.on_participant_joined, on_player_joined)
 Speedrun:add_event(Mini_games.events.on_participant_removed, on_player_removed)
 

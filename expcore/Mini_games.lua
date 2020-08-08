@@ -673,9 +673,14 @@ local close_game = Token.register(function(timeout_nonce)
     primitives.state = 'Closing'
     dlog('===== State Change =====')
 
-    -- Move all players to the lobby
+    -- Move all players to the lobby, and remove and selector if present
+    local selector = mini_game.participant_selector
     for _, player in ipairs(game.connected_players) do
         Mini_games.respawn_spectator(player)
+        if selector then
+            dlog('Remove selector:', player.name)
+            xpcall(selector, internal_error, player, true)
+        end
     end
 
     -- Call on_close core event to clean up global variables and any thing else
@@ -715,14 +720,9 @@ function Mini_games.stop_game()
         end
     end
 
-    -- Remove all participants from the game, this also places them into spectator, and removes selector if present
-    local selector = mini_game.participant_selector
+    -- Remove all participants from the game, this also places them into spectator
     for _, player in ipairs(participants) do
         Mini_games.remove_participant(player)
-        if skip_timeout and selector then
-            dlog('Remove selector:', player.name)
-            xpcall(selector, internal_error, player, true)
-        end
     end
 
     -- Disable all events for this mini game
