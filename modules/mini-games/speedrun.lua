@@ -1,6 +1,8 @@
 local Mini_games   = require 'expcore.Mini_games'
 local Global       = require 'utils.global'
 local Gui          = require 'expcore.gui._require'
+local Token        = require 'utils.token'
+local Task         = require 'utils.task'
 local TeamSelector = require 'modules.gui.mini_game_team_selector'
 
 local targets    = {}
@@ -66,6 +68,27 @@ local function reset_globals()
     reset_table(forces)
 end
 
+----- Map Gen -----
+
+local function ready_condition()
+    local ctn = 0
+    for _ in pairs(surfaces) do ctn = ctn + 1 end
+    return ctn == primitives.team_count
+end
+
+local surface_generator = Token.register(function(remaining)
+    local last = #remaining
+    local next_surface = remaining[last]
+    if not next_surface then return false end
+    remaining[last] = nil
+
+    local surface = game.create_surface(next_surface, { seed=remaining.seed })
+    surface.request_to_generate_chunks({0, 0}, 5)
+    surfaces[next_surface] = surface
+
+    return true
+end)
+
 ----- Game Init and Start -----
 
 --- First function called by the mini game core to prepare for the start of a game
@@ -81,16 +104,16 @@ local function init(args)
     primitives.team_count = team_count
 
     -- Create a surface for each team with the same seed and settings
-    local seed, indicators = math.random(4294967295), goals[target]
+    local remaining, indicators = { seed = math.random(4294967295) }, goals[target]
     for i = 1, team_count do
         local name = 'Team '..i
+        remaining[i] = name
         forces[name] = game.create_force(name)
         forces[name].share_chart = true
-        surfaces[name] = game.create_surface(name, { seed=seed })
-        surfaces[name].request_to_generate_chunks({0, 0}, 5)
         progress[name] = { 0, indicators.total, table.deep_copy(indicators) }
     end
 
+    Task.queue_task(surface_generator, remaining, team_count)
 end
 
 --- Called once enough participants are present to start the game and map generation is done
@@ -469,6 +492,7 @@ end
 --- Register the mini game to the mini game module
 local Speedrun = Mini_games.new_game('Speedrun')
 Speedrun:set_core_events(init, start, stop, close)
+Speedrun:set_ready_condition(ready_condition)
 Speedrun:set_participant_selector(TeamSelector.selector(function() return forces end), true)
 Speedrun:set_gui(main_gui, gui_callback)
 Speedrun:add_option(2) -- how many options are needed with /start
