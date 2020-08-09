@@ -98,4 +98,9 @@ function Public.update_gui(start_tick)
     end
 end
 
+function Public.check_player(player)
+    local gui = player.gui.center[GuiName]
+    return gui and gui.valid
+end
+
 return Public

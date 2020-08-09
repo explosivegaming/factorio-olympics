@@ -74,8 +74,7 @@ end
 function Public.update_gui(current, required)
     local caption = current .. ' out of ' .. required .. ' players needed to begin!'
     for _, player in pairs(game.connected_players) do
-        local center = player.gui.center
-        local gui = center[GuiName]
+        local gui = player.gui.center[GuiName]
         if gui and gui.valid then
             gui.visible = true
             local required_e = gui.content_flow.label_flow.required
@@ -84,6 +83,11 @@ function Public.update_gui(current, required)
             end
         end
     end
+end
+
+function Public.check_player(player)
+    local gui = player.gui.center[GuiName]
+    return gui and gui.valid
 end
 
 return Public

@@ -68,6 +68,12 @@ local function dlog(...)
     log{'mini-game-log', primitives.current_game or 'None', primitives.state, table.concat({...}, ' ')}
 end
 
+--- Used to set the current state and log it
+local function set_internal_state(new)
+    primitives.state = new
+    dlog('===== State Change =====')
+end
+
 ----- Defining Mini games -----
 
 --- Create a new instance of a mini game, the name must be unique
@@ -199,6 +205,11 @@ end
 --- Get the start time for the running game, get the start tick for the current mini game, during loading this is the time when loading started
 function Mini_games.get_start_time()
     return primitives.start_tick
+end
+
+--- Get the required amount of participants needed before a game can start
+function Mini_games.get_participant_requirement()
+    return primitives.participant_requirement
 end
 
 ----- Participants -----
@@ -433,9 +444,8 @@ local start_game = Token.register(function(timeout_nonce)
     if primitives.timeout_nonce ~= timeout_nonce then return end
     local mini_game = Mini_games.get_current_game()
     primitives.start_tick = game.tick
-    primitives.state = 'Starting'
+    set_internal_state('Starting')
     WaitingGui.remove_gui()
-    dlog('===== State Change =====')
 
     -- Puts all players into spectator mode, teleports them to the surface, and call cleanup on participant selector
     local surfaces, selector, surface = mini_game.surface_names, mini_game.participant_selector, nil
@@ -472,8 +482,7 @@ local start_game = Token.register(function(timeout_nonce)
 
     dlog('Start:', mini_game.name, 'Player Count:', #data.players)
     game.write_file('mini_games/started_game', game.table_to_json(data), false, 0)
-    primitives.state = 'Started'
-    dlog('===== State Change =====')
+    set_internal_state('Started')
 end)
 
 --- Show the loading screen to a player, this will auto update until game is started
@@ -491,12 +500,13 @@ check_ready = Token.register(function()
     if not success then
         Event.remove_removable_nth_tick(60, check_ready)
     elseif ready then
-        dlog('Game Countdown', 'Remove Loading')
-        Event.remove_removable_nth_tick(60, check_ready)
+        set_internal_state('Countdown')
         game.print('Game starts in 10 seconds')
         primitives.timeout_nonce = math.random()
         Task.set_timeout(10, start_game, primitives.timeout_nonce)
+        dlog('Remove Loading')
         LoadingGui.remove_gui()
+        Event.remove_removable_nth_tick(60, check_ready)
     else
         LoadingGui.update_gui(primitives.start_tick)
     end
@@ -512,65 +522,43 @@ end
 --- Check if the game has enough participants to start, will move onto loading screen or start once the require amount is met
 -- If the amount is below the required at any point between on_init and on_start the waiting screen will be shown
 function check_participant_count()
-    if primitives.state ~= 'Waiting' and primitives.state ~= 'Loading' then return end
+    local state = primitives.state
+    if state ~= 'Waiting' and state ~= 'Loading' and state ~= 'Countdown' then return end
     local mini_game = Mini_games.get_current_game()
-    local selector = mini_game.participant_selector
 
     -- If the participants count is less than required, and there has been less 2 minutes waiting, stop load checking, and update wait gui
     if #participants < primitives.participant_requirement and game.tick < primitives.start_tick + 7200 then
         WaitingGui.update_gui(#participants, primitives.participant_requirement)
-        if primitives.state == 'Waiting' then return end
-        primitives.state = 'Waiting'
-        dlog('===== State Change =====')
+        if state == 'Waiting' then return end
+        set_internal_state('Waiting')
 
         dlog('Remove Loading')
-        Event.remove_removable_nth_tick(60, check_ready)
         primitives.timeout_nonce = 0
+        Event.remove_removable_nth_tick(60, check_ready)
         LoadingGui.remove_gui()
-        if not selector then return end
-
-        -- Find all possible participants who arent already in the participants list
-        local done = Mini_games.get_participant_names(true)
-        local all_participants = Roles.get_role_by_name('Participant'):get_players(true)
-        if #all_participants > 0 then table.shuffle_table(all_participants) end
-
-        -- Show the custom participant selector to the possible participants
-        for _, player in ipairs(all_participants) do
-            if not done[player.name] then
-                done[player.name] = true
-                dlog('Add selector:', player.name)
-                xpcall(selector, internal_error, player)
-            end
-        end
 
         return
     end
 
     -- Check if we are already in loading to prevent extra calls
-    if primitives.state == 'Loading' then return end
+    if state == 'Loading' or state == 'Countdown' then return end
 
     -- When requirement is met remove the gui
     dlog('Remove Waiting')
     WaitingGui.remove_gui(true)
-    primitives.state = 'Loading'
-    dlog('===== State Change =====')
     if mini_game.ready_condition then
         -- Start checking that the game is ready to start
+        set_internal_state('Loading')
         Event.add_removable_nth_tick(60, check_ready)
-        if mini_game.hide_load_gui and not selector then return end
-        -- Show the loading screen and remove any custom selector
+        -- Show the loading screen to anyone who could see the wait gui
         for _, player in ipairs(game.connected_players) do
-            if not mini_game.hide_load_gui then
+            if WaitingGui.check_player(player) then
                 Mini_games.show_loading_screen(player)
-            end
-            if selector then
-                dlog('Remove selector:', player.name)
-                xpcall(selector, internal_error, player, true)
             end
         end
     else
         -- No checks needed, start game count down now
-        dlog('Game Countdown')
+        set_internal_state('Countdown')
         game.print('Game starts in 10 seconds')
         primitives.timeout_nonce = math.random()
         Task.set_timeout(10, start_game, primitives.timeout_nonce)
@@ -594,8 +582,7 @@ function Mini_games.start_game(name, player_count, args)
     primitives.custom_selector = false
     primitives.current_game = name
     primitives.start_tick = game.tick
-    primitives.state = 'Waiting'
-    dlog('===== State Change =====')
+    set_internal_state('Waiting')
     dlog('Enable handlers:', name)
 
     -- Enable all events for this mini game
@@ -670,8 +657,7 @@ end
 local close_game = Token.register(function(timeout_nonce)
     if primitives.timeout_nonce ~= timeout_nonce then return end
     local mini_game = Mini_games.get_current_game()
-    primitives.state = 'Closing'
-    dlog('===== State Change =====')
+    set_internal_state('Closing')
 
     -- Move all players to the lobby, and remove and selector if present
     local selector = mini_game.participant_selector
@@ -691,8 +677,7 @@ local close_game = Token.register(function(timeout_nonce)
     end
 
     primitives.current_game = nil
-    primitives.state = 'Closed'
-    dlog('===== State Change =====')
+    set_internal_state('Closed')
 end)
 
 --- Stop a mini game, calls on_stop then on_participant_removed
@@ -700,8 +685,7 @@ function Mini_games.stop_game()
     local mini_game = assert(Mini_games.get_current_game(), 'No mini game is currently running')
     local skip_timeout = primitives.state ~= 'Started'
     Event.remove_removable_nth_tick(60, check_ready)
-    primitives.state = 'Stopping'
-    dlog('===== State Change =====')
+    set_internal_state('Stopping')
 
     -- Calls on_stop core event to stop the game and to get the data to write to file
     -- on_stop should return an array of position entries which are tables of the

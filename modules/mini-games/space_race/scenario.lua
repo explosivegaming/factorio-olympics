@@ -318,10 +318,6 @@ local function on_close()
     primitives.won = nil
 
     uranium_gen_reset()
-
-    for i, player in ipairs(game.players) do
-        Gui.destroy_if_valid(player.gui.center['Space-Race'])
-    end
 end
 
 --- Used to print a force won, and stop the game
@@ -468,19 +464,6 @@ end
 
 ----- Gui and Registering -----
 
---- Update the gui for all players
-function Public.update_gui()
-    for _, player in ipairs(game.connected_players) do
-        local gui = player.gui.center['Space-Race']
-        if gui and player.force.name == 'player' then
-            -- todo make an update function
-            join_gui.show_gui{player_index = player.index}
-        elseif gui then
-            Gui.destroy_if_valid(gui)
-        end
-    end
-end
-
 --- Added a remote interface
 remote.add_interface('space-race', Public)
 
@@ -542,7 +525,7 @@ local space_race = Mini_games.new_game("Space_Race")
 space_race:set_core_events(on_init, start, stop, on_close)
 space_race:add_map_gen('Space_Race', 'modules.mini-games.space_race.map_gen.map')
 space_race:set_ready_condition(ready_condition)
-space_race:set_participant_selector(TeamSelector.selector(function() return {primitives.force_USA, primitives.force_USSR} end), true)
+space_race:set_participant_selector(TeamSelector.selector(Public.get_teams), true)
 space_race:set_gui(main_gui, gui_callback)
 space_race:add_option(3)
 

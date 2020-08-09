@@ -63,7 +63,7 @@ local function reset_globals()
     reset_table(primitives)
     reset_table(progress)
     reset_table(surfaces)
-    reset_table(surfaces)
+    reset_table(forces)
 end
 
 ----- Game Init and Start -----
