@@ -745,6 +745,43 @@ function Mini_games.stop_game()
 
 end
 
+--- Get the english suffix that follows a position number
+--@author https://rosettacode.org/wiki/N%27th#Lua
+local function getSuffix (n)
+    local lastTwo, lastOne = n % 100, n % 10
+    if lastTwo > 3 and lastTwo < 21 then return "th" end
+    if lastOne == 1 then return "st" end
+    if lastOne == 2 then return "nd" end
+    if lastOne == 3 then return "rd" end
+    return "th"
+end
+
+--- Get the position number with the suffix appended
+local function Nth (n) return n..getSuffix(n) end
+
+--- Colours used while printing positions in chat
+local message_format = '%s: %s with %d %s'
+local colors =  {
+    ["1st"] = { 255, 215, 0   },
+    ["2nd"] = { 192, 192, 192 },
+    ["3rd"] = { 205, 127, 50  },
+    default = { 128, 128, 128 }
+}
+
+--- Print the results to game chat, follows the same requires as returning from on_close with optional names table as an override
+function Mini_games.print_results(results, unit, names, limit)
+    names = names or {}
+    limit = limit or 5
+    for i, result in ipairs(results) do
+        if result.place < limit then
+            local place = Nth(result.place)
+            local colour = colors[place] or colors.default
+            local name = names[i] or table.concat(result.players, ', ')
+            game.print(message_format:format(place, name, result.score, unit), colour)
+        end
+    end
+end
+
 --- Raise an error which causes the mini game to stop
 function Mini_games.error_in_game(error_game)
     game.print("An error has occurred things may be broken, error: "..error_game)

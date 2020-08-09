@@ -109,7 +109,6 @@ local function init(args)
         local name = 'Team '..i
         remaining[i] = name
         forces[name] = game.create_force(name)
-        forces[name].share_chart = true
         progress[name] = { 0, indicators.total, table.deep_copy(indicators) }
     end
 
@@ -119,8 +118,23 @@ end
 --- Called once enough participants are present to start the game and map generation is done
 local function start()
     -- Chart the start area for all teams
+    local removed = {}
     for name, force in pairs(forces) do
-        force.chart(surfaces[name], {{x = 80, y = 80}, {x = -80, y = -80}})
+        if #force.players > 0 then
+            force.share_chart = true
+            force.chart(surfaces[name], {{x = 80, y = 80}, {x = -80, y = -80}})
+        else
+            game.merge_forces(force, game.forces.player)
+            game.delete_surface(surfaces[name])
+            removed[name] = true
+        end
+    end
+
+    -- Remove references to invalid forces
+    for name in pairs(removed) do
+        progress[name] = nil
+        surfaces[name] = nil
+        forces[name] = nil
     end
 
     -- Added all the teams to the progress table
@@ -144,7 +158,7 @@ local function stop()
         ctn = ctn + 1
         local names = {}
         for index, player in ipairs(forces[name].players) do names[index] = player.name end
-        scores[ctn] = { name, math.floor(team[1]/team[2]*1000)/1000, names }
+        scores[ctn] = { name, math.floor(team[1]/team[2]*1000)/10, names }
     end
 
     -- Sort by team progress
@@ -153,11 +167,25 @@ local function stop()
     end)
 
     -- Format the results table
-    local results = {}
-    for index, team in ipairs(scores) do
-        results[index] = { place = index, score = team[2], players = team[3] }
+    local results, names = {}, {}
+    for _, team in ipairs(scores) do
+        local score = team[2]
+        local last = #results
+        local up_result = results[last]
+        if up_result and up_result.score == score then
+            names[last] = names[last]..', '..team[1]
+            local players = up_result.players
+            local offset = #players
+            for index, player in ipairs(team[3]) do
+                players[offset+index] = player
+            end
+        else
+            names[last+1] = team[1]
+            results[last+1] = { place = last+1, score = score, players = team[3] }
+        end
     end
 
+    Mini_games.print_results(results, 'percent', names)
     return results
 end
 

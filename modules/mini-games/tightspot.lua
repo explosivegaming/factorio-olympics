@@ -345,29 +345,6 @@ end
 --- When a player is removed hide the gui
 local on_player_removed = on_player_left
 
---- Get the english suffix that follows a position number
---@author https://rosettacode.org/wiki/N%27th#Lua
-local function getSuffix (n)
-    local lastTwo, lastOne = n % 100, n % 10
-    if lastTwo > 3 and lastTwo < 21 then return "th" end
-    if lastOne == 1 then return "st" end
-    if lastOne == 2 then return "nd" end
-    if lastOne == 3 then return "rd" end
-    return "th"
-end
-
---- Get the position number with the suffix appended
-local function Nth (n) return n..getSuffix(n) end
-
---- Colours used while printing positions in chat
-local message_format = '%s: %s with %d points'
-local colors =  {
-    ["1st"] = { 255, 215, 0   },
-    ["2nd"] = { 192, 192, 192 },
-    ["3rd"] = { 205, 127, 50  },
-    default = { 128, 128, 128 }
-}
-
 --- Function called by mini game module to stop this game
 local function stop()
     game.speed = 1
@@ -388,7 +365,6 @@ local function stop()
     for i, score in ipairs(scores) do
         local money = score[1]
         local player_name = score[2]
-        local place = Nth(i)
 
         local up_result = results[#results]
         if up_result and up_result.score == math.round(money, 2) then
@@ -402,10 +378,9 @@ local function stop()
             }
         end
 
-        local colour = colors[place] or colors.default
-        game.print(message_format:format(place, player_name, money), colour)
     end
 
+    Mini_games.print_results(results, 'points')
     return results
 end
 

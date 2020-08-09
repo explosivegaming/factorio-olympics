@@ -242,23 +242,12 @@ end
 --- Get the position number with the suffix appended
 local function Nth (n) return n..getSuffix(n) end
 
---- Colours used while printing positions in chat
-local message_format = '%s: %s with %s seconds.'
-local colors =  {
-    ["1st"] = { 255, 215, 0   },
-    ["2nd"] = { 192, 192, 192 },
-    ["3rd"] = { 205, 127, 50  },
-    default = { 128, 128, 128 }
-}
-
 --- Function called by mini game module to stop a race
 local function stop()
     -- Print the place that each player came
     local results = {}
     for name, value in pairs(scores["finish_times"]) do
         local time = value[2]
-        local place = Nth(value[1])
-        local colour = colors[place] or colors.default
 
         local up_result = results[#results]
         if up_result and up_result.score == math.round(time, 2) then
@@ -272,9 +261,9 @@ local function stop()
             }
         end
 
-        game.print(message_format:format(place, name, time), colour)
     end
 
+    Mini_games.print_results(results, 'seconds')
     return results
 end
 
