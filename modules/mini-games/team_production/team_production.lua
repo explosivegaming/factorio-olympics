@@ -470,7 +470,7 @@ local function production_finished(force)
   if not script_data.progress[force.name] then return end
 
   table.insert(script_data.winners, force)
-  local points = script_data.points_per_win
+  local points = config.points_per_win
 
   for j, winning_force in pairs (script_data.winners) do
     if winning_force == force then
@@ -511,7 +511,7 @@ end
 
 --- Called to assign points after a round of shopping list
 local function shopping_list_finished()
-  local total_points = script_data.points_per_win * script_data.number_of_teams
+  local total_points = config.points_per_win * script_data.number_of_teams
   local points_per_task = total_points/(#script_data.task_items)
   for k, item in pairs (script_data.task_items) do
     for j, force in pairs (game.forces) do
@@ -741,7 +741,7 @@ local function check_set_areas()
   if not force.valid then return end
   local offset_x = grid_position[1] * (distance * 2 + config.distance_between_areas)
   local offset_y = grid_position[2] * (distance * 2 + config.distance_between_areas)
-  map_scripts.create_tiles(set.map_set_size, set.map_set_tiles, offset_x, offset_y, false, config.distance_between_areas)
+  map_scripts.create_tiles(set.map_set_size, set.map_set_tiles, offset_x, offset_y, script_data)
   force.set_spawn_position({offset_x, offset_y}, script_data.surface)
   force.rechart()
 end

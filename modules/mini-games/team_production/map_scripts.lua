@@ -1,7 +1,7 @@
 
 local Public = {}
 
-function Public.create_tiles(distance, tiles, offset_x, offset_y)
+function Public.create_tiles(distance, tiles, offset_x, offset_y, script_data)
 
   local count = 1
   local map_tiles = {}
@@ -27,14 +27,14 @@ function Public.create_tiles(distance, tiles, offset_x, offset_y)
     end
   end
 
-  game.surfaces[1].set_tiles(map_tiles, true)
-  game.surfaces[1].regenerate_decorative(nil, chunks)
+  script_data.surface.set_tiles(map_tiles, true)
+  script_data.surface.regenerate_decorative(nil, chunks)
 end
 
 function Public.recreate_entities(entities, offset_x, offset_y, force, duration, script_data)
   if not entities or not force or not offset_x or not duration or not offset_y then return end
   local tick = game.tick
-  local surface = game.surfaces[1]
+  local surface = script_data.surface
   for name, array in pairs (entities) do
     for k, entity in pairs (array) do
       if (k + tick) % duration == 0 then

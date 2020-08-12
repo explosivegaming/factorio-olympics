@@ -1,6 +1,5 @@
 return {
   ticks_to_generate_entities = 20,
-  time_between_rounds = 60*60,
   time_before_round_end = 60*10,
   points_per_win = 20,
   distance_between_areas = 10,
@@ -106,8 +105,6 @@ return {
     {name = "water-barrel", count = 100}
   },
 
-  area_radius = 3,
-  gap = 2,
   offsets =
   {
     {-1, -1},
