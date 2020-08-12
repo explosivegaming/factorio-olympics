@@ -1,45 +1,33 @@
 local Mini_games   = require 'expcore.Mini_games'
 local Global       = require 'utils.global'
+local Gui          = require 'expcore.gui._require'
+local TeamSelector = require 'modules.gui.mini_game_team_selector'
 
-local config = require("config")
-local map_sets = require("map_sets")
-local map_scripts = require("map_scripts")
-local mod_gui = require("mod-gui")
-local util = require("util")
+local config      = require("config.mini_games.team_production")
+local map_sets    = require("modules.mini-games.team_production.map_sets")
+local map_scripts = require("modules.mini-games.team_production.map_scripts")
+local mod_gui     = require("mod-gui")
+local util        = require("util")
 
-local offsets =
-{
-  {-1, -1},
-  {0, -1},
-  {1, -1},
-  {1, 0},
-  {1, 1},
-  {0, 1},
-  {-1, 1},
-  {-1, 0},
-}
+config.teams = {}
+for _, force_data in ipairs(config.force_list) do
+  config.teams[force_data.name] = force_data
+end
 
-local area_radius = 3
-local gap = 2
-
-local game_state =
-{
-  in_round = 1,
-  intermission = 2
-}
+config.disallowed_map = {}
+for _, name in ipairs(config.disabled_items) do
+  config.disallowed_map[name] = true
+end
 
 local script_data =
 {
-  online_players = {},
   winners = {},
   points = {},
-  recent_points = {},
-  chests = {},
+  output_chests = {},
   input_chests = {},
-  round_number = 0,
-  recent_round_number = 0,
-  game_state = game_state.intermission,
-  number_of_teams = #offsets
+  task_items = {},
+  progress = {},
+  forces = {}
 }
 
 Global.register(script_data, function(tbl)
@@ -48,18 +36,35 @@ end)
 
 ----- Util Functions -----
 
-local function time_left()
-  return game.tick - script_data.round_timer_value
+--- Internal, Used to clear tables of all values
+local function reset_table(table)
+  for k in pairs(table) do
+      table[k] = nil
+  end
 end
 
+--- Internal, Reset all global tables
+local function reset_globals()
+  reset_table(script_data.winners)
+  reset_table(script_data.points)
+  reset_table(script_data.output_chests)
+  reset_table(script_data.input_chests)
+  reset_table(script_data.task_items)
+  reset_table(script_data.progress)
+  reset_table(script_data.forces)
+end
+
+--- Returns the amount of time till the end of the round
+local function time_left()
+  return game.tick - Mini_games.get_start_time()
+end
+
+--- Returns a colour that is a bit lighter than the one given
 local function lighten(c)
   return {r = 1 - (1 - c.r) * 0.5, g = 1 - (1 - c.g) * 0.5, b = 1 - (1 - c.b) * 0.5, a = 1}
 end
 
-local function get_spawn_coordinate(n)
-  return offsets[n]
-end
-
+--- Formats ticks into minutes and seconds
 local function format_time(ticks)
   local raw_seconds = ticks / 60
   local minutes = math.floor(raw_seconds/60)
@@ -67,6 +72,7 @@ local function format_time(ticks)
   return string.format("%d:%02d", minutes, seconds)
 end
 
+--- Shuffles a table based on random input from player name and position
 local function shuffle_table(t)
   local count = 2
   local math = math
@@ -83,24 +89,7 @@ local function shuffle_table(t)
   end
 end
 
-local function spairs(t, order)
-  local keys = {}
-  for k in pairs(t) do keys[#keys+1] = k end
-  if order then
-    table.sort(keys, function(a, b) return order(t, a, b) end)
-  else
-    table.sort(keys)
-  end
-
-  local i = 0
-  return function()
-    i = i + 1
-    if keys[i] then
-      return keys[i], t[keys[i]]
-    end
-  end
-end
-
+--- Selects a random entry from a probability table
 local function select_from_probability_table(probability_table)
   local roll_max = 0
   for _, item in pairs(probability_table) do
@@ -116,240 +105,9 @@ local function select_from_probability_table(probability_table)
   end
 end
 
------ Game Start -----
-
-local chest_offset = {0, 2}
-local function make_starting_chests()
-
-  local items = script_data.starting_inventories[script_data.round_inventory]
-  if not items then return end
-
-  local item_prototypes = game.item_prototypes
-
-  local surface = game.surfaces[1]
-
-  for _, team in pairs (script_data.force_list) do
-
-    local force = game.forces[team.name]
-    local position = force.get_spawn_position(surface)
-    position.x = position.x + chest_offset[1]
-    position.y = position.y + chest_offset[2]
-
-    local chest_position = surface.find_non_colliding_position("steel-chest", position, 16, 1)
-
-    if position then
-      local chest = surface.create_entity{name = "steel-chest", position = chest_position, force = force}
-      for _, item in pairs (items) do
-        if item_prototypes[item.name] then
-          chest.insert(item)
-        end
-      end
-    end
-
-  end
-
-end
-
-local function generate_production_task()
-
-  local number_of_items = math.random(script_data.max_count_of_production_tasks)
-  local max_count = math.ceil(math.random(5) / number_of_items)
-  local min_count = script_data.challenge_type == "shopping_list" and 3 or 1
-  if script_data.challenge_type == "shopping_list" then max_count = (max_count * 2) + 3 end
-  local items_to_choose = script_data.item_list
-  shuffle_table(items_to_choose)
-  local task_items = {}
-  script_data.round_input = nil
-  for k = 1, number_of_items do
-    local item = items_to_choose[k]
-    if item.input then
-      if not script_data.round_input then
-        script_data.round_input = item.input
-      else
-        break
-      end
-    end
-    task_items[k] = {}
-    task_items[k].name = item.name
-    task_items[k].count = math.random(min_count, max_count) * script_data.item_list[k].count
-    task_items[k].remaining = script_data.challenge_type == "shopping_list" and task_items[k].count or nil
-  end
-  script_data.task_items = task_items
-  script_data.progress = {}
-  for j, force in pairs (game.forces) do
-    script_data.progress[force.name] = {}
-    for k, item in pairs (script_data.task_items) do
-      script_data.progress[force.name][item.name] = 0
-    end
-  end
-
-end
-
-local function fill_input_chests()
-  if not script_data.input_chests then return end
-  if not script_data.round_input then return end
-  if not game.item_prototypes[script_data.round_input] then game.print("BAD INPUT ITEM") return end
-  for k, chest in pairs (script_data.input_chests) do
-    if chest.valid then
-      chest.clear_items_inside()
-      chest.insert{name = script_data.round_input, count = 10000}
-    else
-      table.remove(script_data.input_chests, k)
-    end
-  end
-end
-
-local function chart_all()
-  for k, force in pairs (game.forces) do
-    force.chart_all()
-  end
-end
-
-local function select_inventory() return select_from_probability_table(script_data.inventory_probabilities) end
-
-local function select_equipment() return select_from_probability_table(script_data.equipment_probabilities) end
-
-local function select_challenge_type() return select_from_probability_table(script_data.challange_type_probabilities) end
-
-local function start_challenge()
-
-  script_data.game_state = game_state.in_round
-
-  script_data.winners = {}
-  script_data.round_number = script_data.round_number + 1
-
-  if script_data.recent_round_number == script_data.recent_round_count then
-    script_data.recent_round_number = 0
-    script_data.recent_points = {}
-    game.reset_time_played()
-  end
-
-  script_data.recent_round_number = script_data.recent_round_number + 1
-  script_data.round_timer_value = game.tick
-  script_data.winners = {}
-  script_data.force_points = {}
-
-  script_data.round_inventory = select_inventory()
-  script_data.round_equipment = select_equipment()
-  script_data.challenge_type = select_challenge_type()
-
-  make_starting_chests()
-
-  generate_production_task()
-  fill_input_chests()
-
-  chart_all()
-  game.play_sound{path = "utility/research_completed"}
-
-end
-
------ Game Init -----
-
-local function setup_unlocks(force)
-  if not force.valid then return end
-  force.research_all_technologies()
-  local disallowed_map = {}
-  for k, name in pairs (script_data.disabled_items) do
-    disallowed_map[name] = true
-  end
-  for recipe_name, recipe in pairs (force.recipes) do
-    if disallowed_map[recipe_name] then
-      recipe.enabled = false
-    end
-  end
-end
-
-local function create_teams()
-  for k, force_data in pairs(script_data.force_list) do
-    if not game.forces[force_data.name] then
-      local force = game.create_force(force_data.name)
-      setup_unlocks(force)
-      force.disable_research()
-      force.set_ammo_damage_modifier("bullet", -1)
-      force.set_ammo_damage_modifier("flamethrower", -1)
-      force.set_ammo_damage_modifier("capsule", -1)
-      force.set_ammo_damage_modifier("cannon-shell", -1)
-      force.set_ammo_damage_modifier("grenade", -1)
-      force.set_ammo_damage_modifier("electric", -1)
-      force.worker_robots_speed_modifier = 3
-    end
-  end
-  for k, force in pairs (game.forces) do
-    for j, friend in pairs (game.forces) do
-      if force.name ~= friend.name then
-        force.set_cease_fire(friend, true)
-        force.set_friend(friend, true)
-      end
-    end
-  end
-end
-
------ Team Selection -----
-
-local function set_character(player, force)
-  if not player.connected then return end
-  if not force.valid then return end
-  if player.character then player.character.destroy() end
-  player.force = force
-  local character = player.surface.create_entity{name = "character", position = player.surface.find_non_colliding_position("character", player.force.get_spawn_position(player.surface), 10, 2), force = force}
-  player.set_controller{type = defines.controllers.character, character = character}
-end
-
-local function give_equipment(player)
-  if not player.connected then return end
-  if not player.character then return end
-  if not script_data.round_equipment then return end
-
-  if script_data.round_equipment == "small" then
-    player.insert{name = "power-armor", count = 1}
-    local p_armor = player.get_inventory(5)[1].grid
-    p_armor.put({name = "fusion-reactor-equipment"})
-    p_armor.put({name = "exoskeleton-equipment"})
-    p_armor.put({name = "personal-roboport-mk2-equipment"})
-    player.insert{name="construction-robot", count = 25}
-    return
-  end
-end
-
-local function set_player(player, team, print)
-  local character = player.character
-  player.character = nil
-  player.associate_character(character)
-  character.color = player.color
-  character.walking_state = {walking = false}
-  local force = game.forces[team.name]
-  set_character(player, force)
-  give_equipment(player)
-  player.color = team.color
-  if print then
-    game.print({"joined-team", player.name, {"color."..team.name}})
-  end
-end
-
--- luacheck:ignore 211/check_color_areas
-local function check_color_areas(print)
-
-  local surface = game.surfaces[1]
-  for _, team in pairs (script_data.force_list) do
-    for _, character in pairs (surface.find_entities_filtered{area = {}--[[get_team_pad_area(k)]], type = "character"}) do
-      if character.player then
-
-        character.player.color = team.color
-        character.player.chat_color = lighten(team.color)
-
-        if script_data.game_state == game_state.in_round then
-          set_player(character.player, team, print)
-          --update_gui()
-        end
-
-      end
-    end
-
-  end
-end
-
 ----- Gui Updates -----
 
+--- Updates / Creates the winners list gui in the left flow
 local function update_winners_list(player)
   local gui = mod_gui.get_frame_flow(player)
   local frame = gui.winners_frame
@@ -364,7 +122,7 @@ local function update_winners_list(player)
     return
   end
 
-  if not script_data.force_points then return end
+  if not script_data.points then return end
 
   if not frame then
     frame = gui.add{type = "frame", name = "winners_frame", caption = {"winner-end-round", format_time(script_data.end_round_tick - game.tick)}, direction = "vertical"}
@@ -380,7 +138,7 @@ local function update_winners_list(player)
 
   for k, force in pairs(script_data.winners) do
     if k > 5 then break end
-    if not script_data.force_points[force.name] then break end
+    if not script_data.points[force.name] then break end
     if not gui.winners_frame.winners_table[force.name] then
 
       local winners_table = gui.winners_frame.winners_table
@@ -412,24 +170,42 @@ local function update_winners_list(player)
       players_label.style.single_line = false
       players_label.style.maximal_width = 300
       winners_table.add{type = "label", caption = format_time(time_left())}
-      winners_table.add{type = "label", caption = script_data.force_points[force.name]}
+      winners_table.add{type = "label", caption = script_data.points[force.name]}
     end
   end
 end
 
-local function update_task_table(player)
-  local gui = mod_gui.get_frame_flow(player)
-  local frame = gui.task_frame
+local update_task_table
+--- Main container for the task list
+-- @element task_frame
+local task_frame =
+Gui.element(function(event_trigger, parent)
+  local frame = parent.add{
+    type = 'frame',
+    name = event_trigger,
+    direction = 'vertical'
+  }
 
-  if not frame then return end
+  local player = Gui.get_player_from_element(parent)
+  update_task_table(player)
+
+  return frame
+end)
+:add_to_left_flow()
+
+--- Button on the top flow used to toggle the player list container
+-- @element toggle_left_element
+Gui.left_toolbar_button('utility/not_enough_repair_packs_icon', 'Production Task List', task_frame, function()
+    return Mini_games.get_running_game() == 'Production Challenge'
+end)
+
+--- Updates the task table gui in left flow
+function update_task_table(player)
+  local frame = Gui.get_left_element(player, task_frame)
   frame.clear()
 
-  frame.caption = {"round", script_data.recent_round_number, script_data.recent_round_count}
   local task = script_data.challenge_type
-  if script_data.start_round_tick ~= nil then
-    frame.add{type = "label", caption = {"round-starting-soon", format_time(script_data.start_round_tick - game.tick)}}
-    return
-  end
+  if not task then return end
   frame.add{type = "label", caption = {task}, style = "caption_label"}
   frame.add{type = "label", name = "round_timer", caption = {"elapsed-time", format_time(time_left())}}
 
@@ -486,68 +262,209 @@ local function update_task_table(player)
   end
 end
 
-local function update_end_timer(player)
-  if not player.connected then return end
-  if not script_data.end_round_tick then return end
-  local gui = mod_gui.get_frame_flow(player)
-  if not gui.winners_frame then return end
-  gui.winners_frame.caption = {"winner-end-round", format_time(script_data.end_round_tick - game.tick)}
-end
-
+--- Updates all the guis for a player
 local function update_player_gui(player)
-  update_end_timer(player)
   update_task_table(player)
   update_winners_list(player)
 end
 
+--- Updates all guis for all players
 local function update_gui()
   for k, player in pairs(game.connected_players) do
     update_player_gui(player)
   end
 end
 
------ Check Victory -----
+----- Game Init -----
 
-local function update_player_tags()
-  local count = 1
-  local players = game.players
-  for name in spairs(script_data.points, function(t, a, b) return t[b] < t[a] end) do
-    local player = players[name]
-    if player then
-      player.tag = "[#"..count.."]"
-    end
-    count = count + 1
-  end
-end
-
-local function give_force_players_points(force, points)
+--- Disables selected recipes for a force
+local function disable_recipes(force)
   if not force.valid then return end
-  if points <= 0 then return end
-  if not script_data.force_points then script_data.force_points = {} end
-
-  if not script_data.force_points[force.name] then
-    script_data.force_points[force.name] = points
-  else
-    script_data.force_points[force.name] = script_data.force_points[force.name] + points
-  end
-
-  for k, player in pairs (force.players) do
-    if not script_data.points[player.name] then
-      script_data.points[player.name] = points
-    else
-      script_data.points[player.name] = script_data.points[player.name] + points
-    end
-
-    if not script_data.recent_points[player.name] then
-      script_data.recent_points[player.name] = points
-    else
-      script_data.recent_points[player.name] = script_data.recent_points[player.name] + points
+  force.research_all_technologies()
+  for recipe_name, recipe in pairs (force.recipes) do
+    if config.disallowed_map[recipe_name] then
+      recipe.enabled = false
     end
   end
-  update_player_tags()
 end
 
-local function team_finished(force)
+--- Create all the teams needed for the game
+local function create_teams(limit)
+  -- Create all the forces
+  for k, force_data in pairs(config.force_list) do
+    if k > limit then return end
+    local force = game.create_force(force_data.name)
+    disable_recipes(force)
+    force.disable_research()
+    force.set_ammo_damage_modifier("bullet", -1)
+    force.set_ammo_damage_modifier("flamethrower", -1)
+    force.set_ammo_damage_modifier("capsule", -1)
+    force.set_ammo_damage_modifier("cannon-shell", -1)
+    force.set_ammo_damage_modifier("grenade", -1)
+    force.set_ammo_damage_modifier("electric", -1)
+    force.worker_robots_speed_modifier = 3
+    script_data.forces[k] = force
+  end
+  -- Set the forces to be friends and have cease fire
+  for _, force in ipairs (script_data.forces) do
+    for _, friend in ipairs (script_data.forces) do
+      if force.name ~= friend.name then
+        force.set_cease_fire(friend, true)
+        force.set_friend(friend, true)
+      end
+    end
+  end
+end
+
+local chunk_size = 10
+--- First function called by mini game core in order to setup for the game starting
+local function init(args)
+
+  local team_count = tonumber(args[1])
+  if not team_count or team_count < 1 then Mini_games.error_in_game('Team count is invalid') end
+  script_data.number_of_teams = team_count
+  create_teams(team_count)
+
+  local surface = game.create_surface('Team Production')
+  local settings = surface.map_gen_settings
+  settings.width = chunk_size * 32 * 2
+  settings.height = chunk_size * 32 * 2
+  surface.map_gen_settings = settings
+  script_data.surface = surface
+
+  for x = -chunk_size, chunk_size do
+    for y = -chunk_size, chunk_size do
+      surface.set_chunk_generated_status({x, y}, defines.chunk_generated_status.entities)
+    end
+  end
+
+  surface.always_day = true
+  game.map_settings.pollution.enabled = false
+
+  script_data.current_map_index = math.random(#map_sets)
+  script_data.set_areas_tick = game.tick + script_data.number_of_teams
+
+end
+
+----- Game Start -----
+
+local chest_offset = {0, 2}
+--- Makes a chest to contain the starting items for a force
+local function make_starting_chests()
+
+  local items = config.starting_inventories[script_data.round_inventory]
+  if not items then return end
+
+  local item_prototypes = game.item_prototypes
+
+  local surface = script_data.surface
+
+  for _, force in ipairs (script_data.forces) do
+
+    local position = force.get_spawn_position(surface)
+    position.x = position.x + chest_offset[1]
+    position.y = position.y + chest_offset[2]
+
+    local chest_position = surface.find_non_colliding_position("steel-chest", position, 16, 1)
+
+    if position then
+      local chest = surface.create_entity{name = "steel-chest", position = chest_position, force = force}
+      for _, item in pairs (items) do
+        if item_prototypes[item.name] then
+          chest.insert(item)
+        end
+      end
+    end
+
+  end
+
+end
+
+--- Sets up the round_input, task_items and progress for this round
+local function generate_production_task()
+
+  local number_of_items = math.random(config.max_count_of_production_tasks)
+  local max_count = math.ceil(math.random(5) / number_of_items)
+  local min_count = script_data.challenge_type == "shopping_list" and 3 or 1
+  if script_data.challenge_type == "shopping_list" then max_count = (max_count * 2) + 3 end
+  local items_to_choose = table.deep_copy(config.item_list)
+  shuffle_table(items_to_choose)
+
+  local task_items = script_data.task_items
+  for k = 1, number_of_items do
+    local item = items_to_choose[k]
+    if item.input then
+      if not script_data.round_input then
+        script_data.round_input = item.input
+      else
+        break
+      end
+    end
+    task_items[k] = {}
+    task_items[k].name = item.name
+    task_items[k].count = math.random(min_count, max_count) * config.item_list[k].count
+    task_items[k].remaining = script_data.challenge_type == "shopping_list" and task_items[k].count or nil
+  end
+
+  for j, force in pairs (game.forces) do
+    script_data.progress[force.name] = {}
+    for k, item in pairs (script_data.task_items) do
+      script_data.progress[force.name][item.name] = 0
+    end
+  end
+
+end
+
+--- Fills the the input chests with the input item, ran on start and every 1000 ticks
+local function fill_input_chests()
+  if not script_data.input_chests then return end
+  if not script_data.round_input then return end
+  if not game.item_prototypes[script_data.round_input] then game.print("BAD INPUT ITEM") return end
+  for k, chest in pairs (script_data.input_chests) do
+    if chest.valid then
+      chest.clear_items_inside()
+      chest.insert{name = script_data.round_input, count = 10000}
+    else
+      table.remove(script_data.input_chests, k)
+    end
+  end
+end
+
+--- Charts the whole map for a force, ran on start and every 300 ticks
+local function chart_all()
+  for k, force in pairs (game.forces) do
+    force.chart_all()
+  end
+end
+
+--- Used to select the starting conditions for this round
+local function select_inventory() return select_from_probability_table(config.inventory_probabilities) end
+local function select_equipment() return select_from_probability_table(config.equipment_probabilities) end
+local function select_challenge_type() return select_from_probability_table(config.challenge_type_probabilities) end
+
+--- Called by mini game core to start the game
+local function start()
+
+  script_data.round_inventory = select_inventory()
+  script_data.round_equipment = select_equipment()
+  script_data.challenge_type = select_challenge_type()
+
+  make_starting_chests()
+  generate_production_task()
+  fill_input_chests()
+  chart_all()
+
+  for k, player in pairs(game.players) do
+    Gui.toggle_left_element(player, task_frame, true)
+    update_player_gui(player)
+  end
+
+end
+
+----- Game Stop -----
+
+--- Called to assign points to a force during a production challenge
+local function production_finished(force)
   if not force.valid then return end
   if not script_data.progress then return end
   if not script_data.progress[force.name] then return end
@@ -566,7 +483,7 @@ local function team_finished(force)
     script_data.end_round_tick = game.tick + script_data.time_before_round_end
   end
 
-  give_force_players_points(force, points)
+  script_data.points[force.name] = points
   for k, player in pairs(game.players) do
     if player.force ~= force then
       player.print({"finished-task", {"color."..force.name}})
@@ -578,7 +495,8 @@ local function team_finished(force)
   end
 end
 
-local function calculate_force_points(force,item, points)
+--- Assigns points to a team based on the item that was made
+local function calculate_force_points(force, item, points)
   if points <= 0 then return end
   if not script_data.progress then return end
   if not script_data.progress[force.name] then return end
@@ -588,10 +506,11 @@ local function calculate_force_points(force,item, points)
   local count = script_data.progress[force.name][item.name]
   local total = item.count
   local awarded_points = math.floor((count/total)*points)
-  give_force_players_points(force, awarded_points)
+  script_data.points[force.name] = awarded_points
 end
 
-local function shopping_task_finished()
+--- Called to assign points after a round of shopping list
+local function shopping_list_finished()
   local total_points = script_data.points_per_win * script_data.number_of_teams
   local points_per_task = total_points/(#script_data.task_items)
   for k, item in pairs (script_data.task_items) do
@@ -599,28 +518,12 @@ local function shopping_task_finished()
       calculate_force_points(force, item, points_per_task)
     end
   end
-
-  for name, points in spairs(script_data.force_points, function(t, a, b) return t[b] < t[a] end) do
-    if points > 0 then
-      table.insert(script_data.winners, game.forces[name])
-    end
-  end
-  script_data.end_round_tick = game.tick + 1
-  for k, player in pairs (game.players) do
-    update_winners_list(player)
-  end
 end
 
+--- Checks if victory condition have been met for each force
 local function check_victory(force)
   if not script_data.challenge_type then return end
   if not force.valid then return end
-  if not script_data.winners then return end
-
-  for k, winners in pairs (script_data.winners) do
-    if force == winners then
-      return
-    end
-  end
 
   local challenge_type = script_data.challenge_type
 
@@ -632,13 +535,12 @@ local function check_victory(force)
       end
     end
     if finished_tasks >= #script_data.task_items then
-      team_finished(force)
+      production_finished(force)
     end
     return
   end
 
   if challenge_type == "shopping_list" then
-    if script_data.winners[1] then return end
     local finished_tasks = 0
     for k, item in pairs (script_data.task_items) do
       if item.remaining == 0 then
@@ -646,14 +548,89 @@ local function check_victory(force)
       end
     end
     if finished_tasks >= #script_data.task_items then
-      shopping_task_finished()
+      Mini_games.stop_game()
     end
     return
   end
+
+end
+
+--- Checks if the game is ready to end, used with production challenge
+local function check_end_of_round()
+  if game.tick ~= script_data.end_round_tick then return end
+  Mini_games.stop_game()
+end
+
+--- Called by mini game core to stop a game and get the results
+local function stop()
+  local challenge_type = script_data.challenge_type
+  if challenge_type == "shopping_list" then
+    shopping_list_finished()
+  end
+
+  local scores, ctn = {}, 0
+  -- Get all the data needed to write results
+  for force_name, points in pairs(script_data.points) do
+      ctn = ctn + 1
+      local names = {}
+      for index, player in ipairs(game.forces[force_name].players) do names[index] = player.name end
+      scores[ctn] = { force_name, points, names }
+  end
+
+  -- Sort by team points
+  table.sort(scores, function(a, b)
+      return a[2] > b[2]
+  end)
+
+  -- Format the results table
+  local results, names = {}, {}
+  for _, team in ipairs(scores) do
+      local score = team[2]
+      local last = #results
+      local up_result = results[last]
+      if up_result and up_result.score == score then
+          names[last] = names[last]..', '..team[1]
+          local players = up_result.players
+          local offset = #players
+          for index, player in ipairs(team[3]) do
+              players[offset+index] = player
+          end
+      else
+          names[last+1] = team[1]
+          results[last+1] = { place = last+1, score = score, players = team[3] }
+      end
+  end
+
+  Mini_games.print_results(results, 'points', names)
+  return results
+end
+
+----- Game Close -----
+
+--- Last function which is called by the mini game core to clean up after a game
+local function close()
+  game.delete_surface(script_data.surface)
+
+  for _, force in ipairs (script_data.forces) do
+    game.merge_forces(force, game.forces.player)
+  end
+
+  script_data.round_input = nil
+  script_data.challenge_type = nil
+  script_data.end_round_tick = nil
+
+  for _, player in pairs(game.players) do
+    local gui = mod_gui.get_frame_flow(player)
+    Gui.destroy_if_valid(gui.winners_frame)
+    Gui.toggle_left_element(player, task_frame, false)
+  end
+
+  reset_globals()
 end
 
 ----- Check Chests -----
 
+--- Checks the items in a chest using production rules
 local function check_chests_production(chest)
   if not script_data.task_items then return end
   for k, item in pairs (script_data.task_items) do
@@ -668,6 +645,7 @@ local function check_chests_production(chest)
   end
 end
 
+--- Checks the items in a chest using shopping list rules
 local function check_chests_shopping_list(chest)
   if not script_data.task_items then return end
   for k, item in pairs (script_data.task_items) do
@@ -683,8 +661,9 @@ local function check_chests_shopping_list(chest)
   end
 end
 
+--- Checks all chests for required items and then checks if forces have won
 local function check_chests()
-  if not script_data.chests then return end
+  if not script_data.output_chests then return end
 
   local task = script_data.challenge_type
   if not task then return end
@@ -699,9 +678,9 @@ local function check_chests()
     error("Unknown challenge type: "..task)
   end
 
-  for k, chest in pairs (script_data.chests) do
+  for k, chest in pairs (script_data.output_chests) do
     if not chest.valid then
-      script_data.chests[k] = nil
+      script_data.output_chests[k] = nil
     else
       update_chest(chest)
     end
@@ -711,125 +690,31 @@ local function check_chests()
   end
 end
 
------ Round Start and End -----
-
-local function get_team_pad_position(index)
-  local offset = offsets[index]
-  local origin =
-  {
-    offset[1] * ((area_radius * 2) + gap),
-    offset[2] * ((area_radius * 2) + gap)
-  }
-  return origin
-end
-
-local function set_spectator(player)
-  if not player.connected then return end
-
-  local character = player.character
-  if character then
-    character.destroy()
-  end
-
-  player.set_controller{type = defines.controllers.god}
-  player.force = "player"
-
-  local characters = player.get_associated_characters()
-  if characters[1] then
-    player.character = characters[1]
-  else
-    player.teleport(player.force.get_spawn_position(game.surfaces[1]))
-    player.create_character()
-  end
-
-end
-
-local function check_end_of_round()
-  if game.tick ~= script_data.end_round_tick then return end
-
-  script_data.game_state = game_state.intermission
-
-  check_chests()
-
-  script_data.end_round_tick = nil
-  script_data.start_round_tick = game.tick + script_data.time_between_rounds
-  script_data.chests = nil
-  script_data.input_chests = nil
-  script_data.task_items = nil
-  script_data.progress = nil
-  script_data.challenge_type = nil
-
-  for k, team in pairs (script_data.force_list) do
-    local force = game.forces[team.name]
-    force.set_spawn_position(get_team_pad_position(k), game.surfaces[1])
-  end
-
-  for k, player in pairs(game.players) do
-    set_spectator(player)
-    update_player_gui(player)
-    local gui = mod_gui.get_frame_flow(player)
-    if gui.winners_frame then
-      gui.winners_frame.caption = {"round-winners"}
-    end
-  end
-
-  game.print({"next-round-soon", (script_data.time_between_rounds / 60)})
-  game.play_sound{path = "utility/research_completed"}
-
-end
-
-local function check_start_round()
-  if game.tick ~= script_data.start_round_tick then return end
-  script_data.start_round_tick = nil
-  start_challenge()
-  for k, player in pairs(game.players) do
-    update_player_gui(player)
-  end
-end
-
 ----- Map Gen -----
 
-local function set_areas(i)
-  if not script_data.previous_map_size then
-    script_data.previous_map_size = 5
-  else
-    script_data.previous_map_size = map_sets[script_data.current_map_index].map_set_size
-  end
-  script_data.previous_map_index = script_data.current_map_index
-  script_data.current_map_index = i
-  if not map_sets[i] then return end
-
-  script_data.clear_areas_tick = game.tick + script_data.number_of_teams + 1
-end
-
-local function check_start_set_areas()
-  if not script_data.start_round_tick then return end
-  --Calculates when to start settings the areas
-  if script_data.start_round_tick - ((2 * script_data.number_of_teams) + 1 + ((script_data.number_of_teams) * script_data.ticks_to_generate_entities)) == game.tick then
-    set_areas(math.random(#map_sets))
-  end
-end
-
+--- Generates all the entities for the team play areas, started by setting script_data.set_entities_tick
 local function check_start_setting_entities()
-  --Start setting the entities
   if not script_data.set_entities_tick then return end
   local entities = map_sets[script_data.current_map_index].map_set_entities
   local distance = map_sets[script_data.current_map_index].map_set_size
-  local index = math.ceil((script_data.set_entities_tick - game.tick)/script_data.ticks_to_generate_entities)
+  local index = math.ceil((script_data.set_entities_tick - game.tick)/config.ticks_to_generate_entities)
+
   if index == 0 then
     script_data.set_entities_tick = nil
     return
   end
-  local listed = script_data.force_list[index]
+
+  local listed = config.force_list[index]
   if not listed then return end
 
-  local grid_position = get_spawn_coordinate(index)
+  local grid_position = config.offsets[index]
   local force = game.forces[listed.name]
-  local offset_x = grid_position[1] * (distance*2 + script_data.distance_between_areas)
-  local offset_y = grid_position[2] * (distance*2 + script_data.distance_between_areas)
-  map_scripts.recreate_entities(entities, offset_x, offset_y, force, script_data.ticks_to_generate_entities, script_data)
+  local offset_x = grid_position[1] * (distance*2 + config.distance_between_areas)
+  local offset_y = grid_position[2] * (distance*2 + config.distance_between_areas)
+  map_scripts.recreate_entities(entities, offset_x, offset_y, force, config.ticks_to_generate_entities, script_data)
 end
 
+--- Generates all the tiles for the team player areas, started by setting script_data.set_entities_tick
 local function check_set_areas()
   if not script_data.set_areas_tick then return end
   local set = map_sets[script_data.current_map_index]
@@ -838,13 +723,14 @@ local function check_set_areas()
 
   if index == 0 then
     script_data.set_areas_tick = nil
-    script_data.set_entities_tick = game.tick + (script_data.number_of_teams * script_data.ticks_to_generate_entities)
+    script_data.set_entities_tick = game.tick + (script_data.number_of_teams * config.ticks_to_generate_entities)
     return
   end
-  local listed = script_data.force_list[index]
+
+  local listed = config.force_list[index]
   if not listed then return end
 
-  local grid_position = get_spawn_coordinate(index)
+  local grid_position = config.offsets[index]
   local force = game.forces[listed.name]
 
   if not force then
@@ -853,44 +739,75 @@ local function check_set_areas()
   end
 
   if not force.valid then return end
-  local offset_x = grid_position[1] * (distance * 2 + script_data.distance_between_areas)
-  local offset_y = grid_position[2] * (distance * 2 + script_data.distance_between_areas)
-  map_scripts.create_tiles(set.map_set_size, set.map_set_tiles, offset_x, offset_y, false, script_data.distance_between_areas)
-  force.set_spawn_position({offset_x, offset_y}, game.surfaces[1])
+  local offset_x = grid_position[1] * (distance * 2 + config.distance_between_areas)
+  local offset_y = grid_position[2] * (distance * 2 + config.distance_between_areas)
+  map_scripts.create_tiles(set.map_set_size, set.map_set_tiles, offset_x, offset_y, false, config.distance_between_areas)
+  force.set_spawn_position({offset_x, offset_y}, script_data.surface)
   force.rechart()
 end
 
-local function check_clear_areas()
-  if not script_data.clear_areas_tick then return end
-  if not script_data.previous_map_index then
-    script_data.previous_map_index = 1
-  end
-  local set = map_sets[script_data.previous_map_index]
-  local distance = set.map_set_size
-  local index = script_data.clear_areas_tick - game.tick
-  if index == 0 then
-    script_data.clear_areas_tick = nil
-    script_data.set_areas_tick = game.tick + script_data.number_of_teams
+--- Checks when the map is generated, both tasks will set there tick checks to nil
+local function ready_condition()
+  -- required time: script_data.number_of_teams + (script_data.number_of_teams * config.ticks_to_generate_entities)
+  return script_data.set_entities_tick == nil and script_data.set_areas_tick == nil
+end
+
+----- Player Events -----
+
+--- Gives equipment to the player
+local function give_equipment(player)
+  if not player.connected then return end
+  if not player.character then return end
+  if not script_data.round_equipment then return end
+
+  if script_data.round_equipment == "small" then
+    player.insert{name = "power-armor", count = 1}
+    local p_armor = player.get_inventory(5)[1].grid
+    p_armor.put({name = "fusion-reactor-equipment"})
+    p_armor.put({name = "exoskeleton-equipment"})
+    p_armor.put({name = "personal-roboport-mk2-equipment"})
+    player.insert{name="construction-robot", count = 25}
     return
   end
-  local grid_position = get_spawn_coordinate(index)
-  local offset_x = grid_position[1] * (distance * 2 + script_data.distance_between_areas)
-  local offset_y = grid_position[2] * (distance * 2 + script_data.distance_between_areas)
-  map_scripts.clear_tiles(set.map_set_size, offset_x, offset_y, script_data.distance_between_areas)
+end
+
+--- Triggered when a participant is added to the game
+local function on_player_added(event)
+  local player = game.players[event.player_index]
+  local force = player.force
+  local team = config.teams[force.name]
+  player.color = team.color
+  player.chat_color = lighten(team.color)
+end
+
+--- Triggered when a participant joins the game
+local function on_player_joined(event)
+  local player = game.players[event.player_index]
+  if Mini_games.get_current_state() == 'Starting' then
+    local surface = script_data.surface
+
+    -- Teleport the player to the new surface
+    if player.character then player.character.destroy() end
+    local pos = surface.find_non_colliding_position('character', player.force.get_spawn_position(surface), 10, 2)
+    local character = surface.create_entity{ name = 'character', position = pos, force = player.force }
+    player.teleport(pos, surface)
+    player.character = character
+
+    -- Set permission group and give starting items
+    game.permissions.get_group('Default').add_player(player)
+    give_equipment(player)
+  end
+end
+
+--- Trigger when a participant is removed from the game
+local function on_player_removed(event)
+  local player = game.players[event.player_index]
+  player.force = game.forces.player
 end
 
 ----- Events -----
 
-local function create_task_frame(player)
-  local gui = mod_gui.get_frame_flow(player)
-  local frame = gui.task_frame
-  if frame then
-    frame.destroy()
-  end
-  gui.add{name = "task_frame", type = "frame", direction = "vertical", caption = {"round", script_data.recent_round_number, script_data.recent_round_count}}
-  update_task_table(player)
-end
-
+--- Checks if an entity is in a forces play area
 local function is_in_area(entity, force)
   local origin = force.get_spawn_position(entity.surface)
   local position = entity.position
@@ -904,62 +821,35 @@ local function is_in_area(entity, force)
   return true
 end
 
-local on_player_created = function(event)
-  local player = game.players[event.player_index]
-  if not (player and player.valid) then return end
-
-  set_spectator(player)
-  create_task_frame(player)
-  update_player_gui(player)
-  update_player_tags()
-  player.spectator = true
-end
-
---[[local on_player_joined_game = function(event)
-  local player = game.players[event.player_index]
-  if not (player and player.valid) then return end
-
-  set_spectator(player)
-  update_player_gui(player)
-  update_player_tags()
-end]]
-
+--- Triggered before a player leaves the game
 local on_pre_player_left_game = function(event)
   local player = game.get_player(event.player_index)
   if not (player and player.valid) then return end
 
-  if script_data.game_state == game_state.in_round then
+  if Mini_games.get_current_state() == 'Started' and player.force ~= 'player' then
     -- We are in a round, kill his character so he doesn't leave with all the machines.
     local character = player.character
-    player.character = nil
+
     if character then
-      if player.force == "player" then
-        character.destroy()
-      else
-        character.die()
-        local corpse = player.surface.find_entities_filtered{type = "character-corpse", position = player.position}[1]
-        if corpse then
-          corpse.character_corpse_player_index = player.index
-        end
+      character.die()
+      local corpse = player.surface.find_entities_filtered{type = "character-corpse", position = player.position}[1]
+      if corpse then
+        corpse.character_corpse_player_index = player.index
       end
     end
-    for k, next_character in pairs (player.get_associated_characters()) do
-      next_character.destroy()
-    end
-    set_spectator(player)
+
   end
 
 end
 
+--- Single on_tick event for map gen, might be possible to convert to tasks
 local on_tick = function()
-  check_end_of_round()
-  check_clear_areas()
   check_set_areas()
   check_start_setting_entities()
-  check_start_set_areas()
-  check_start_round()
+  check_end_of_round()
 end
 
+--- Stops players building outside there play areas
 local on_built_entity = function(event)
   local entity = event.created_entity
   if not (entity and entity.valid) then return end
@@ -969,6 +859,7 @@ local on_built_entity = function(event)
   end
 end
 
+--- Stops players from deconstructing out side of there play area
 local on_marked_for_deconstruction = function(event)
   local player = game.players[event.player_index]
   local entity = event.entity
@@ -979,8 +870,49 @@ local on_marked_for_deconstruction = function(event)
   end
 end
 
+----- Registration -----
+
+--- Used to select the number of laps to complete
+-- @element text_field_for_laps
+local team_count_textfield =
+Gui.element{
+    type = 'textfield',
+    text = '2',
+    numeric = true,
+    tooltip = 'Team Count'
+}
+:style{
+  width = 25
+}
+
+--- Main gui used to start the game
+-- @element main_gui
+local main_gui =
+Gui.element(function(_,parent)
+  team_count_textfield(parent)
+end)
+
+--- Used to read the data from the gui
+local function gui_callback(parent)
+    local args = {}
+
+    local team_count = parent[team_count_textfield.name].text
+    args[1] = team_count
+
+    return args
+end
+
 local team_production = Mini_games.new_game('Production Challenge')
-team_production:add_event(defines.events.on_player_created, on_player_created)
+team_production:set_core_events(init, start, stop, close)
+team_production:set_ready_condition(ready_condition)
+team_production:set_participant_selector(TeamSelector.selector(function() return script_data.forces end), true)
+team_production:set_gui(main_gui, gui_callback)
+team_production:add_option(1) -- how many options are needed with /start
+
+team_production:add_event(Mini_games.events.on_participant_added, on_player_added)
+team_production:add_event(Mini_games.events.on_participant_joined, on_player_joined)
+team_production:add_event(Mini_games.events.on_participant_removed, on_player_removed)
+
 team_production:add_event(defines.events.on_pre_player_left_game, on_pre_player_left_game)
 team_production:add_event(defines.events.on_tick, on_tick)
 team_production:add_event(defines.events.on_built_entity, on_built_entity)
@@ -990,36 +922,3 @@ team_production:add_nth_tick(301, chart_all)
 team_production:add_nth_tick(29, check_chests)
 team_production:add_nth_tick(997, fill_input_chests)
 team_production:add_nth_tick(60, update_gui)
-
-local chunk_size = 10
-team_production.on_init = function()
-
-  local surface = game.surfaces[1]
-  local settings = surface.map_gen_settings
-  settings.width = chunk_size * 32 * 2
-  settings.height = chunk_size * 32 * 2
-  surface.map_gen_settings = settings
-
-  for x = -chunk_size, chunk_size do
-    for y = -chunk_size, chunk_size do
-      surface.set_chunk_generated_status({x, y}, defines.chunk_generated_status.entities)
-    end
-  end
-
-  global.team_production = global.team_production or script_data
-  config.setup_config(script_data)
-  create_teams()
-
-  script_data.points = {}
-  script_data.recent_points = {}
-  update_gui()
-
-  game.surfaces[1].always_day = true
-  game.map_settings.pollution.enabled = false
-
-  game.forces.player.disable_research()
-  for k, recipe in pairs (game.forces.player.recipes) do
-    recipe.enabled = false
-  end
-
-end

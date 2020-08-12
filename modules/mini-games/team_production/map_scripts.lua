@@ -31,25 +31,7 @@ function Public.create_tiles(distance, tiles, offset_x, offset_y)
   game.surfaces[1].regenerate_decorative(nil, chunks)
 end
 
-function Public.clear_tiles(distance, offset_x, offset_y, gap)
-
-  local blank_tiles = {}
-  local count = 1
-
-  for X = -(distance + gap), (distance + gap) - 1 do
-    for Y = -(distance + gap), (distance + gap) - 1 do
-      blank_tiles[count] = {name = "out-of-map", position = {X + offset_x, Y + offset_y}}
-      count = count + 1
-    end
-  end
-
-  game.surfaces[1].set_tiles(blank_tiles, false)
-end
-
 function Public.recreate_entities(entities, offset_x, offset_y, force, duration, script_data)
-  if not script_data.chests then script_data.chests = {} end
-  if not script_data.input_chests then script_data.input_chests = {} end
-
   if not entities or not force or not offset_x or not duration or not offset_y then return end
   local tick = game.tick
   local surface = game.surfaces[1]
@@ -69,7 +51,7 @@ function Public.recreate_entities(entities, offset_x, offset_y, force, duration,
           v.destructible = false
           v.minable = false
           v.rotatable = false
-          table.insert(script_data.chests, v)
+          table.insert(script_data.output_chests, v)
         elseif name == "blue-chest" then
           local v = surface.create_entity({force = force, name = name, position = position})
           v.destructible = false

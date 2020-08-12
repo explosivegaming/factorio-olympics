@@ -1,41 +1,35 @@
-local Public = {}
+return {
+  ticks_to_generate_entities = 20,
+  time_between_rounds = 60*60,
+  time_before_round_end = 60*10,
+  points_per_win = 20,
+  distance_between_areas = 10,
 
-function Public.setup_config(script_data)
-  script_data.ticks_to_generate_entities = 20
-  script_data.time_between_rounds = 60*60
-  script_data.time_before_round_end = 60*60*2
-  script_data.minimum_teams = 2
-  script_data.players_per_team = 1
-  script_data.points_per_win = 20
-  script_data.recent_round_count = 5
-  script_data.start_round_tick = 60 * 10 --first round starts in 60 seconds
-  script_data.distance_between_areas = 10
-  script_data.afk_time = 60*60*3.5 -- 3 and a half minutes
-  script_data.inventory_probabilities =
+  inventory_probabilities =
   {
     {probability = 4, value = "small"},
     {probability = 12, value = "medium"},
     {probability = 8, value = "large"}
-  }
+  },
 
-  script_data.equipment_probabilities =
+  equipment_probabilities =
   {
     {probability = 6, value = "none"},
     {probability = 4, value = "small"}
-  }
+  },
 
-  script_data.challange_type_probabilities =
+  challenge_type_probabilities =
   {
     {probability = 22, value = "production"},
     {probability = 14, value = "shopping_list"}
-  }
+  },
 
-  script_data.max_count_of_production_tasks = 3
+  max_count_of_production_tasks = 3,
 
   -- With one tasks, the result amount is from 2*count up to 10*count
   -- With two tasks, the result amount is from 2*count up to 5*count
   -- With three tasks, the result amount is from 2*count up to 3*count
-  script_data.item_list =
+  item_list =
   {
     {name = "accumulator", count = 400, input = "battery"},
     {name = "accumulator", count = 50, input = "sulfur"},
@@ -110,9 +104,23 @@ function Public.setup_config(script_data)
     {name = "train-stop", count = 50},
     {name = "transport-belt", count = 250},
     {name = "water-barrel", count = 100}
-  }
+  },
 
-  script_data.force_list =
+  area_radius = 3,
+  gap = 2,
+  offsets =
+  {
+    {-1, -1},
+    {0, -1},
+    {1, -1},
+    {1, 0},
+    {1, 1},
+    {0, 1},
+    {-1, 1},
+    {-1, 0},
+  },
+
+  force_list =
   {
     { name = "orange" , color = { r = 0.869, g = 0.5  , b = 0.130, a = 0.5 }},
     { name = "purple" , color = { r = 0.485, g = 0.111, b = 0.659, a = 0.5 }},
@@ -122,9 +130,9 @@ function Public.setup_config(script_data)
     { name = "yellow" , color = { r = 0.835, g = 0.666, b = 0.077, a = 0.5 }},
     { name = "pink"   , color = { r = 0.929, g = 0.386, b = 0.514, a = 0.5 }},
     { name = "cyan"   , color = { r = 0.275, g = 0.755, b = 0.712, a = 0.5 }}
-  }
+  },
 
-  script_data.starting_inventories =
+  starting_inventories =
   {
     ["small"] =
     {
@@ -182,9 +190,9 @@ function Public.setup_config(script_data)
       {name = "medium-electric-pole", count = 30},
       {name = "substation", count = 8}
     }
-  }
+  },
 
-  script_data.disabled_items =
+  disabled_items =
   {
     "submachine-gun",
     "pistol",
@@ -206,6 +214,4 @@ function Public.setup_config(script_data)
     "energy-shield-equipment",
     "battery-equipment"
   }
-end
-
-return Public
+}
