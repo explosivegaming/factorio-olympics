@@ -1,6 +1,6 @@
 return {
   ticks_to_generate_entities = 20,
-  time_before_round_end = 60*10,
+  time_before_round_end = 60*60*2,
   points_per_win = 20,
   distance_between_areas = 10,
 

@@ -148,7 +148,7 @@ local function update_winners_list(player)
       local this = winners_table.add{type = "label", name = force.name, caption = {"", {"color."..force.name}, " ", {"team"}}}
       local color = {r = 0.8, g = 0.8, b = 0.8, a = 0.8}
 
-      for i, check_force in pairs (script_data.force_list) do
+      for i, check_force in pairs (config.force_list) do
         if force.name == check_force.name then
           color = lighten(check_force.color)
           break
@@ -262,10 +262,20 @@ function update_task_table(player)
   end
 end
 
+--- Updates the timer on the winner gui as the round is ending
+local function update_end_timer(player)
+  if not player.connected then return end
+  if not script_data.end_round_tick then return end
+  local gui = mod_gui.get_frame_flow(player)
+  if not gui.winners_frame then return end
+  gui.winners_frame.caption = {"winner-end-round", format_time(script_data.end_round_tick - game.tick)}
+end
+
 --- Updates all the guis for a player
 local function update_player_gui(player)
   update_task_table(player)
   update_winners_list(player)
+  update_end_timer(player)
 end
 
 --- Updates all guis for all players
@@ -480,7 +490,7 @@ local function production_finished(force)
   end
 
   if #script_data.winners == 1 then
-    script_data.end_round_tick = game.tick + script_data.time_before_round_end
+    script_data.end_round_tick = game.tick + config.time_before_round_end
   end
 
   script_data.points[force.name] = points
@@ -489,7 +499,7 @@ local function production_finished(force)
       player.print({"finished-task", {"color."..force.name}})
       player.play_sound({path = "utility/game_lost"})
     else
-      player.print({"your-team-win", script_data.force_points[force.name]})
+      player.print({"your-team-win", script_data.points[force.name]})
       player.play_sound({path = "utility/game_won"})
     end
   end
@@ -526,6 +536,8 @@ local function check_victory(force)
   if not force.valid then return end
 
   local challenge_type = script_data.challenge_type
+  if Mini_games.get_current_state() ~= 'Started' then return end
+  if script_data.points[force.name] then return end
 
   if challenge_type == "production" then
     local finished_tasks = 0
@@ -536,6 +548,7 @@ local function check_victory(force)
     end
     if finished_tasks >= #script_data.task_items then
       production_finished(force)
+      update_gui()
     end
     return
   end
@@ -549,6 +562,7 @@ local function check_victory(force)
     end
     if finished_tasks >= #script_data.task_items then
       Mini_games.stop_game()
+      update_gui()
     end
     return
   end
