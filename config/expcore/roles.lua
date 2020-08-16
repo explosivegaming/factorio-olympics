@@ -151,4 +151,5 @@ Roles.override_player_roles{
     ['SimonFlapse'] = {'Developer'},
     ['TheKid'] = {'Developer'},
     ['tovernaar123'] = {'Developer'},
+    ['Sadler'] = {'Developer'},
 }
