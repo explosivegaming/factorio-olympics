@@ -7,6 +7,7 @@ local MS = require 'utils.map_gen.minigame_surface'
 local Mini_games = require "expcore.Mini_games"
 local Gui = require 'expcore.gui'
 local Commands = require 'expcore.commands'
+local TeamSelector = require 'modules.gui.mini_game_team_selector'
 
 --- Feature Requires
 local Retailer = require 'modules.mini-games.space_race.retailer'
@@ -14,7 +15,6 @@ local Market_Items = require 'modules.mini-games.space_race.market_items'
 local config = require 'config.mini_games.space_race'
 
 --- Gui and map gen requires
-local join_gui = require 'modules.mini-games.space_race.join_gui'
 local cliff = require 'modules.mini-games.space_race.cliff_generator'
 local market_events = require 'modules.mini-games.space_race.market_handler'
 local uranium_gen = require('modules.mini-games.space_race.map_gen.uranium_island')
@@ -181,16 +181,6 @@ local function on_init(args)
     end
 end
 
---- Show the join team gui when wanting to select participants
-local function participant_selector(player, remove_selector)
-    if remove_selector then
-        Gui.destroy_if_valid(player.gui.center['Space-Race'])
-        Mini_games.show_waiting_screen(player)
-    else
-        join_gui.show_gui{ player_index = player.index }
-    end
-end
-
 --- When a player joins teleport them to there base, if start of game then give them a character
 local get_teleport_location
 local function on_player_joined(event)
@@ -199,8 +189,10 @@ local function on_player_joined(event)
     if Mini_games.get_current_state() == 'Starting' then
         if player.character then player.character.destroy() end
         local pos = get_teleport_location(player.force, true)
-        local character = MS.get_surface().create_entity{name='character', position=pos, force=player.force}
-        player.set_controller{type = defines.controllers.character, character = character}
+        player.set_controller{ type = defines.controllers.god }
+        player.teleport(pos, MS.get_surface())
+        player.create_character()
+
         game.permissions.get_group('Default').add_player(player)
         for _, item in pairs(starting_items) do
             player.insert(item)
@@ -296,42 +288,6 @@ local function ready_condition()
        and check_tile_type(surface, 479,   0,  'water')      and check_tile_type(surface, -479, 0,  'water')
 end
 
---- Make a player join team usa
-function Public.join_usa(player)
-    local force_USA = primitives.force_USA
-
-    local force = player.force
-    if force == force_USA then
-        player.print('[color=red]Failed to join [/color][color=yellow]'..force_USA.name..',[/color][color=red] you are already part of this team![/color]')
-        return false
-    end
-
-    player.force = force_USA
-    player.print('[color=green]You have joined '..force_USA.name..'![/color]')
-    Mini_games.show_waiting_screen(player)
-    Mini_games.add_participant(player)
-    Public.update_gui()
-    return true
-end
-
---- Make a player join team ussr
-function Public.join_ussr(player)
-    local force_USSR = primitives.force_USSR
-
-    local force = player.force
-    if force == force_USSR then
-        player.print('[color=red]Failed to join [/color][color=yellow]'..force_USSR.name..',[/color][color=red] you are already part of this team![/color]')
-        return false
-    end
-
-    player.force = force_USSR
-    player.print('[color=green]You have joined '..force_USSR.name..'![/color]')
-    Mini_games.show_waiting_screen(player)
-    Mini_games.add_participant(player)
-    Public.update_gui()
-    return true
-end
-
 ----- Game Stop -----
 
 --- When a participant is removed move them to the player force
@@ -362,10 +318,6 @@ local function on_close()
     primitives.won = nil
 
     uranium_gen_reset()
-
-    for i, player in ipairs(game.players) do
-        Gui.destroy_if_valid(player.gui.center['Space-Race'])
-    end
 end
 
 --- Used to print a force won, and stop the game
@@ -512,19 +464,6 @@ end
 
 ----- Gui and Registering -----
 
---- Update the gui for all players
-function Public.update_gui()
-    for _, player in ipairs(game.connected_players) do
-        local gui = player.gui.center['Space-Race']
-        if gui and player.force.name == 'player' then
-            -- todo make an update function
-            join_gui.show_gui{player_index = player.index}
-        elseif gui then
-            Gui.destroy_if_valid(gui)
-        end
-    end
-end
-
 --- Added a remote interface
 remote.add_interface('space-race', Public)
 
@@ -586,7 +525,7 @@ local space_race = Mini_games.new_game("Space_Race")
 space_race:set_core_events(on_init, start, stop, on_close)
 space_race:add_map_gen('Space_Race', 'modules.mini-games.space_race.map_gen.map')
 space_race:set_ready_condition(ready_condition)
-space_race:set_participant_selector(participant_selector, true)
+space_race:set_participant_selector(TeamSelector.selector(Public.get_teams), true)
 space_race:set_gui(main_gui, gui_callback)
 space_race:add_option(3)
 

@@ -22,6 +22,7 @@ return {
     'modules.mini-games.Race',
     'modules.mini-games.tightspot',
     'modules.mini-games.space_race.scenario',
+    'modules.mini-games.speedrun',
 
     -- Config Files
     'config.expcore.command_auth_admin', -- commands tagged with admin_only are blocked for non admins
