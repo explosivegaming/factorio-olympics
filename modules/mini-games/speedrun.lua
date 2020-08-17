@@ -110,6 +110,9 @@ local function init(args)
     primitives.team_count = team_count
 
     local map_seed = tonumber(args[3])
+    if type(args[3]) == 'string' and args[3]:lower() == 'random' then
+        map_seed = math.random(4294967295)
+    end
     if not map_seed or map_seed < 0 or map_seed > 4294967295 then Mini_games.error_in_game('Map seed is invalid') end
 
     -- Create a surface for each team with the same seed and settings
