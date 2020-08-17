@@ -103,8 +103,11 @@ local function init(args)
     if not team_count or team_count < 1 then Mini_games.error_in_game('Team count is invalid') end
     primitives.team_count = team_count
 
+    local map_seed = tonumber(args[3])
+    if not map_seed or map_seed < 0 or map_seed > 4294967295 then Mini_games.error_in_game('Map seed is invalid') end
+
     -- Create a surface for each team with the same seed and settings
-    local remaining, indicators = { seed = math.random(4294967295) }, goals[target]
+    local remaining, indicators = { seed = map_seed }, goals[target]
     for i = 1, team_count do
         local name = 'Team '..i
         remaining[i] = name
@@ -496,12 +499,26 @@ Gui.element{
   width = 25
 }
 
+--- Used to select the seed for this game
+-- @element map_seed_textfield
+local map_seed_textfield =
+Gui.element{
+    type = 'textfield',
+    text = '',
+    numeric = true,
+    tooltip = 'Map Seed - Blank for random'
+}
+:style{
+  width = 25
+}
+
 --- Main gui used to start the game
 -- @element main_gui
 local main_gui =
 Gui.element(function(_,parent)
     target_dropdown(parent)
     team_count_textfield(parent)
+    map_seed_textfield(parent)
 end)
 
 --- Used to read the data from the gui
@@ -514,6 +531,10 @@ local function gui_callback(parent)
     local required_laps = parent[team_count_textfield.name].text
     args[2] = required_laps
 
+    local map_seed = parent[map_seed_textfield.name].text
+    if map_seed == '' then map_seed = math.random(4294967295) end
+    args[3] = map_seed
+
     return args
 end
 
@@ -523,7 +544,7 @@ Speedrun:set_core_events(init, start, stop, close)
 Speedrun:set_ready_condition(ready_condition)
 Speedrun:set_participant_selector(TeamSelector.selector(function() return forces end), true)
 Speedrun:set_gui(main_gui, gui_callback)
-Speedrun:add_option(2) -- how many options are needed with /start
+Speedrun:add_option(3) -- how many options are needed with /start
 
 Speedrun:add_event(Mini_games.events.on_participant_joined, on_player_joined)
 Speedrun:add_event(Mini_games.events.on_participant_removed, on_player_removed)
