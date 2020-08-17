@@ -18,8 +18,14 @@ for index, goal in ipairs(goals) do
     lookups[index] = lookup
     targets[index] = goal.name
 
-    local ctn = goal.rockets or 0
+    local ctn = 0
+
     lookup.rockets = goal.rockets and goal.rockets > 0
+    if goal.rockets then ctn = ctn + goal.rockets end
+
+    lookup.satellites = goal.satellites and goal.satellites > 0
+    if goal.satellites then ctn = ctn + goal.satellites end
+
     for _, key in ipairs{'research', 'items', 'entities'} do
         local value = goal[key]
         if value then
@@ -314,13 +320,29 @@ end
 local function on_rocket_launched(event)
     local force = event.rocket_silo.force
     local data = progress[force.name]
+
     local rockets = data[3].rockets
     if rockets and rockets > 0 then
         data[3].rockets = rockets - 1
         data[1] = data[1] + 1
-        data[4] = {'', 'Entity - ', {'entity-name.rocket'}}
+        data[4] = {'', 'Space - ', {'entity-name.rocket'}}
         update_progress(force, data)
     end
+
+    local satellites = data[3].satellites
+    if satellites and satellites > 0 then
+        local rocket = event.rocket
+        if not rocket or not rocket.valid then return end
+        local inventory = rocket.get_inventory(defines.inventory.rocket)
+        local count = inventory.get_item_count('satellite')
+        if count == 0 then return end
+        if count > satellites then count = satellites end
+        data[3].satellites = satellites - count
+        data[1] = data[1] + count
+        data[4] = {'', 'Space - ', {'item-name.satellite'}}
+        update_progress(force, data)
+    end
+
 end
 
 --- Used to check the item productions for each team

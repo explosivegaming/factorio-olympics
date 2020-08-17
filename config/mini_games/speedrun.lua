@@ -53,7 +53,7 @@ return {
             'flying-robot-frame','battery'
         },
         entities = {
-            'steam-engine', 'lab', 'assembling-machine-1', 'assembling-machine-2', 'oil-refinery'
+            'steam-engine', 'lab', 'assembling-machine-1', 'assembling-machine-2', 'pumpjack', 'oil-refinery'
         }
     },
     { --- Standard
@@ -81,13 +81,13 @@ return {
             'productivity-module','flying-robot-frame','battery'
         },
         entities = {
-            'steam-engine', 'lab', 'assembling-machine-1', 'assembling-machine-2', 'oil-refinery', 'rocket-silo'
+            'steam-engine', 'lab', 'assembling-machine-1', 'assembling-machine-2', 'pumpjack', 'oil-refinery', 'rocket-silo'
         }
     },
     { --- Marathon
-        goal = 'Launch ten rockets from a silo, does not require satellites.',
+        goal = 'Launch ten rockets with satellites from a silo.',
         name = 'Marathon',
-        rockets = 10,
+        satellites = 10,
         research = {
             'rocket-silo','concrete','advanced-material-processing','steel-processing','logistic-science-pack',
             'automation-2','electronics','automation','speed-module-3','speed-module-2',
@@ -99,17 +99,18 @@ return {
             'lubricant','battery','low-density-structure'
         },
         items = {
-            'rocket-silo','rocket-control-unit','low-density-structure','rocket-fuel','automation-science-pack',
-            'logistic-science-pack','chemical-science-pack','production-science-pack','utility-science-pack','steel-plate',
-            'iron-plate','iron-ore','processing-unit','electronic-circuit','copper-cable',
+            'satellite','rocket-silo','rocket-control-unit','low-density-structure','rocket-fuel',
+            'automation-science-pack','logistic-science-pack','chemical-science-pack','production-science-pack','utility-science-pack',
+            'processing-unit','electronic-circuit','iron-plate','iron-ore','copper-cable',
             'copper-plate','copper-ore','advanced-circuit','plastic-bar','coal',
-            'electric-engine-unit','engine-unit','iron-gear-wheel','pipe','concrete',
+            'solar-panel','steel-plate','accumulator','battery','radar',
+            'iron-gear-wheel','electric-engine-unit','engine-unit','pipe','concrete',
             'stone-brick','stone','speed-module','solid-fuel','transport-belt',
             'inserter','sulfur','rail','iron-stick','electric-furnace',
-            'productivity-module','flying-robot-frame','battery'
+            'productivity-module','flying-robot-frame'
         },
         entities = {
-            'steam-engine', 'lab', 'assembling-machine-1', 'assembling-machine-2', 'oil-refinery', 'rocket-silo'
+            'steam-engine', 'lab', 'assembling-machine-1', 'assembling-machine-2', 'pumpjack', 'oil-refinery', 'rocket-silo'
         }
     }
 }
