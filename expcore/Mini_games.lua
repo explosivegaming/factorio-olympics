@@ -363,7 +363,13 @@ Event.add(Roles.events.on_role_unassigned, role_event_filter(check_participant_s
 -- Inactive participants (who join before start) will be added to the participants list, or given to participant_selector
 -- Non participants and Inactive participants (who join after start) will be spawned as spectator
 Event.add(defines.events.on_player_joined_game, function(event)
-    local player  = game.players[event.player_index]
+    local player = game.players[event.player_index]
+    if vars.is_lobby == true then
+        player.print('You are now in the main lobby.')
+    elseif vars.is_lobby == false then
+        player.print('You are now in a private server.')
+    end
+
     local started = primitives.state == 'Started'
     local participant = Roles.player_has_role(player, 'Participant')
     if participant and Mini_games.is_participant(player) then
@@ -422,8 +428,16 @@ end)
 local function start_from_lobby(name, player_count, args)
     local server_object  = global.servers[name]
     local server_address = server_object[#server_object]
-    for index, player in ipairs(participants) do
-        player.connect_to_server{ address = server_address, name = name }
+    local clean_name = name:gsub('_', ' '):lower():gsub('(%l)(%w+)', function(a,b) return string.upper(a)..b end)
+    for index, player in pairs(game.connected_players) do
+        player.connect_to_server{
+            address = server_address,
+            name = '\n[color=red]Factorio Olympics: '..clean_name..'[/color]\n',
+            description = 'In order to participate you must be transferred to a private server, please press the connect button below to do so.'
+        }
+    end
+
+    for index in ipairs(participants) do
         participants[index] = nil
     end
 
@@ -735,6 +749,8 @@ function Mini_games.stop_game()
         game.print('Game start canceled')
         primitives.timeout_nonce = math.random()
         Task.set_timeout_in_ticks(1, close_game, primitives.timeout_nonce)
+        local data = { type = 'start_cancelled', name = mini_game.name }
+        game.write_file('mini_games/start_cancelled', game.table_to_json(data), false, 0)
     else
         -- If this was called normally wait 10 seconds before closing the game
         dlog('Lobby Countdown')
