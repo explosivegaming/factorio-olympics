@@ -738,6 +738,8 @@ function Mini_games.stop_game()
         game.print('Game start canceled')
         primitives.timeout_nonce = math.random()
         Task.set_timeout_in_ticks(1, close_game, primitives.timeout_nonce)
+        local data = { type = 'start_cancelled', name = mini_game.name }
+        game.write_file('mini_games/start_cancelled', game.table_to_json(data), false, 0)
     else
         -- If this was called normally wait 10 seconds before closing the game
         dlog('Lobby Countdown')
