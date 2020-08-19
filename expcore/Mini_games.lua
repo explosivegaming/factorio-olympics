@@ -422,8 +422,13 @@ end)
 local function start_from_lobby(name, player_count, args)
     local server_object  = global.servers[name]
     local server_address = server_object[#server_object]
+    local clean_name = name:gsub('_', ' '):lower():gsub('(%l)(%w+)', function(a,b) return string.upper(a)..b end)
     for index, player in pairs(game.connected_players) do
-        player.connect_to_server{ address = server_address, name = name }
+        player.connect_to_server{
+            address = server_address,
+            name = '\n[color=red]Factorio Olympics: '..clean_name..'[/color]\n',
+            description = 'In order to participate you must be transferred to a private server, please press the connect button below to do so.'
+        }
     end
 
     for index in ipairs(participants) do
