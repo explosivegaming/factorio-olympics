@@ -422,8 +422,11 @@ end)
 local function start_from_lobby(name, player_count, args)
     local server_object  = global.servers[name]
     local server_address = server_object[#server_object]
-    for index, player in ipairs(participants) do
+    for index, player in pairs(game.connected_players) do
         player.connect_to_server{ address = server_address, name = name }
+    end
+
+    for index in ipairs(participants) do
         participants[index] = nil
     end
 
