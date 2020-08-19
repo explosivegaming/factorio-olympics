@@ -363,7 +363,13 @@ Event.add(Roles.events.on_role_unassigned, role_event_filter(check_participant_s
 -- Inactive participants (who join before start) will be added to the participants list, or given to participant_selector
 -- Non participants and Inactive participants (who join after start) will be spawned as spectator
 Event.add(defines.events.on_player_joined_game, function(event)
-    local player  = game.players[event.player_index]
+    local player = game.players[event.player_index]
+    if vars.is_lobby == true then
+        player.print('You are now in the main lobby.')
+    elseif vars.is_lobby == false then
+        player.print('You are now in a private server.')
+    end
+
     local started = primitives.state == 'Started'
     local participant = Roles.player_has_role(player, 'Participant')
     if participant and Mini_games.is_participant(player) then
