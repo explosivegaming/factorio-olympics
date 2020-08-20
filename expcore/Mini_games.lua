@@ -11,6 +11,10 @@ local Commands = require 'expcore.commands'
 require 'config.expcore.command_runtime_disable' --required to load before running the script
 
 --- Locals
+local add_DataLobby
+local lobby
+local require_player_list = {}
+local online_player_list  = {}
 local WaitingGui = require 'modules.gui.mini_game_waiting'
 local LoadingGui = require 'modules.gui.mini_game_loading'
 local Mini_games = {
@@ -36,6 +40,7 @@ gen.init{}
 gen.register()
 
 global.servers = {}
+global.running_servers = {}
 --[[
 global.servers= {
     lobby =  "127.0.0.1:12345"
@@ -48,11 +53,15 @@ Global.register({
     participants = participants,
     primitives = primitives,
     vars = vars,
+    online_player_list = online_player_list,
+    require_player_list = require_player_list,
 },function(tbl)
     Mini_games.available = tbl.available_games
     participants = tbl.participants
     primitives = tbl.primitives
     vars = tbl.vars
+    online_player_list = tbl.online_player_list
+    require_player_list = tbl.require_player_list
 end)
 
 --- Used with xpcall
@@ -365,8 +374,33 @@ Event.add(Roles.events.on_role_unassigned, role_event_filter(check_participant_s
 Event.add(defines.events.on_player_joined_game, function(event)
     local player = game.players[event.player_index]
     if vars.is_lobby == true then
+        --Gui stuffs
+        local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
+        for _ , key in pairs(gui_table.children_names) do
+            Gui.destroy_if_valid(gui_table[key])
+        end
+        for ip, name in pairs(global.running_servers) do
+            add_DataLobby(gui_table, name, require_player_list[ip], online_player_list[ip], ip)
+        end
+
         player.print('You are now in the main lobby.')
     elseif vars.is_lobby == false then
+        if Roles.player_has_role(player, 'Participant') then
+            local amount_of_parts = 0
+            for i , player_to_check in ipairs(game.connected_players) do
+                local participant = Roles.player_has_role(player_to_check, 'Participant')
+                if participant then
+                    amount_of_parts = amount_of_parts + 1
+                end
+            end
+            if amount_of_parts ~= 0 then
+                local data = {
+                    type = "amount_of_players",
+                    amount = amount_of_parts,
+                }
+                game.write_file('mini_games/amount_of_players', game.table_to_json(data), false, 0)
+            end
+        end
         player.print('You are now in a private server.')
     end
 
@@ -390,6 +424,22 @@ Event.add(defines.events.on_player_left_game, function(event)
     local player = game.players[event.player_index]
     local started = primitives.state == 'Started'
     local participant = Roles.player_has_role(player, 'Participant')
+    if participant then
+        local amount_of_parts = 0
+        for i , player_to_check in ipairs(game.connected_players) do
+            local _participant = Roles.player_has_role(player_to_check, 'Participant')
+            if _participant then
+                amount_of_parts = amount_of_parts + 1
+            end
+        end
+        if amount_of_parts ~= 0 then
+            local data = {
+                type = "amount_of_players",
+                amount = amount_of_parts,
+            }
+            game.write_file('mini_games/amount_of_players', game.table_to_json(data), false, 0)
+        end
+    end
     if started and Mini_games.is_participant(player) then
         dlog('Participant left:', player.name)
         raise_event('on_participant_left', player)
@@ -429,6 +479,8 @@ local function start_from_lobby(name, player_count, args)
     local server_object  = global.servers[name]
     local server_address = server_object[#server_object]
     local clean_name = name:gsub('_', ' '):lower():gsub('(%l)(%w+)', function(a,b) return string.upper(a)..b end)
+    require_player_list[server_address] = player_count
+    online_player_list[server_address] = 0
     for index, player in pairs(game.connected_players) do
         player.connect_to_server{
             address = server_address,
@@ -928,9 +980,122 @@ Gui.element(function(event_trigger,parent)
 end)
 :add_to_left_flow()
 
+
+
 --- Add a toggle button that can be used when no game is running
 Gui.left_toolbar_button('utility/check_mark', 'Select a mini game to start', mini_game_list, function(player)
     return Roles.player_allowed(player, 'gui/game_start') and (primitives.state == 'Closing' or primitives.state == 'Closed')
+end)
+
+
+----- Lobby gui
+
+local lobby_list = {}
+local perfix = 1
+local function pick_name(name)
+    if lobby_list[name] ~= nil then
+        local new_name = name..perfix
+        if lobby_list[name] ~= nil then return new_name end
+        perfix = perfix + 1
+        return pick_name(name)
+    else
+        perfix = 1
+        return name
+    end
+end
+
+--- Button used to start a mini game
+local join_button =
+Gui.element{
+    type = 'sprite-button',
+    sprite = 'utility/import',
+    style = 'slot_button',
+    tooltip = 'Join game',
+	--name = lobby_counter --should be an integer type
+}
+:style(Gui.sprite_style(30))
+:on_click(function(player, element, _)
+    local index = element.parent.name
+    local lobbyData = lobby_list[index]
+    player.connect_to_server{
+        address = lobbyData.address,
+        name = '\n[color=red]Factorio Olympics: '..lobbyData.name..'[/color]\n',
+        description = 'In order to participate you must be transferred to a private server, please press the connect button below to do so.'
+    }
+end)
+
+--- Adds  data to Lobby_table
+add_DataLobby =
+Gui.element(function(_,parent,name,maxPlayer,currentPlayer, address)
+    name = pick_name(name)
+    local start_flow = parent.add{ type = 'flow', name = name }
+    start_flow.style.padding = 0
+    join_button(start_flow)
+	lobby_list[name] = {name = name, address = address}
+    start_flow.add{
+        type    = "label",
+        style   = "heading_1_label",
+        caption = name:gsub('_', ' '):lower():gsub('(%l)(%w+)', function(a,b) return string.upper(a)..b end)
+    }
+	start_flow.add{
+        type    = "label",
+        style   = "heading_1_label",
+        caption =  '        '..currentPlayer
+    }
+	start_flow.add{
+        type    = "label",
+        style   = "heading_1_label",
+        caption = ' / '
+    }
+	start_flow.add{
+        type    = "label",
+        style   = "heading_1_label",
+        caption =  maxPlayer.. ' Players'
+    }
+end)
+
+--lobby to select a game to join
+lobby =
+Gui.element(function(event_trigger,parent)
+    local container = Gui.container(parent,event_trigger,200)
+
+    -- Add the header
+    Gui.header(container, "Game-Lobby", "You can find a game here.")
+
+    -- Add the scroll table
+	local scroll_table = Gui.scroll_table(container, 250, 1)
+	local scroll_table_style = scroll_table.style
+	scroll_table_style.padding = {3, 3}
+	scroll_table_style.top_cell_padding = 3
+    scroll_table_style.bottom_cell_padding = 3
+    return container.parent
+end)
+:add_to_left_flow()
+
+Mini_games.server_list_updated =
+function ()
+    if vars.is_lobby ~= true then return end
+    lobby_list = {}
+    for i , player in ipairs(game.connected_players) do
+        local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
+        for _ , key in pairs(gui_table.children_names) do
+            Gui.destroy_if_valid(gui_table[key])
+        end
+        for ip, name in pairs(global.running_servers) do
+            add_DataLobby(gui_table, name, require_player_list[ip], online_player_list[ip], ip)
+        end
+    end
+end
+
+Mini_games.set_online_player_count =
+function(amount,ip)
+    online_player_list[ip] = amount
+    Mini_games.server_list_updated()
+end
+
+
+Gui.left_toolbar_button('utility/change_recipe', 'Select a game to join', lobby, function(_)
+    return vars.is_lobby
 end)
 
 ----- Module Return -----
