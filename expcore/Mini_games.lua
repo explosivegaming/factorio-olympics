@@ -395,10 +395,10 @@ Event.add(defines.events.on_player_joined_game, function(event)
             end
             if amount_of_parts ~= 0 then
                 local data = {
-                    type = "amount_of_players",
+                    type = "player_count_changed",
                     amount = amount_of_parts,
                 }
-                game.write_file('mini_games/amount_of_players', game.table_to_json(data), false, 0)
+                game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
             end
         end
         player.print('You are now in a private server.')
@@ -434,10 +434,10 @@ Event.add(defines.events.on_player_left_game, function(event)
         end
         if amount_of_parts ~= 0 then
             local data = {
-                type = "amount_of_players",
+                type = "player_count_changed",
                 amount = amount_of_parts,
             }
-            game.write_file('mini_games/amount_of_players', game.table_to_json(data), false, 0)
+            game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
         end
     end
     if started and Mini_games.is_participant(player) then
