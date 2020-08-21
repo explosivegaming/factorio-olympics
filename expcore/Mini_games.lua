@@ -305,6 +305,7 @@ function Mini_games.remove_participant(player)
             return
         end
     end
+    return 'player not found'
 end
 
 ----- Participant Event Logic -----
@@ -401,7 +402,7 @@ Event.add(defines.events.on_player_joined_game, function(event)
                 game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
             end
         end
-        player.print('You are now in a private server.')
+        player.print('You are now in the game server.')
     end
 
     local started = primitives.state == 'Started'
@@ -771,10 +772,11 @@ function Mini_games.stop_game()
     end
 
     -- Remove all participants from the game, this also places them into spectator
-    for _, player in ipairs(participants) do
+    local amount = #participants
+    for i = amount, 1, -1 do
+        local player = participants[i]
         Mini_games.remove_participant(player)
     end
-
     -- Disable all events for this mini game
     dlog('Disable handlers:', mini_game.name)
     for _, event in ipairs(mini_game.events) do
@@ -871,6 +873,11 @@ Commands.new_command('lobby_all', 'Send everyone to the lobby server.')
 :register(function(_,_)
     for _, player in ipairs(game.connected_players) do
         player.connect_to_server{ address = global.servers["lobby"], name = "lobby" }
+        player.connect_to_server{
+            address = global.servers["lobby"],
+            name = '\n[color=red]Factorio Olympics: '.."lobby"..'[/color]\n',
+            description = 'The game is over you must go back to the lobby.'
+        }
     end
 end)
 
