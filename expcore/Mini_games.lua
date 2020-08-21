@@ -872,7 +872,6 @@ end)
 Commands.new_command('lobby_all', 'Send everyone to the lobby server.')
 :register(function(_,_)
     for _, player in ipairs(game.connected_players) do
-        player.connect_to_server{ address = global.servers["lobby"], name = "lobby" }
         player.connect_to_server{
             address = global.servers["lobby"],
             name = '\n[color=red]Factorio Olympics: '.."lobby"..'[/color]\n',
