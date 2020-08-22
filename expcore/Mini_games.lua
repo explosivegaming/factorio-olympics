@@ -383,7 +383,7 @@ Event.add(defines.events.on_player_joined_game, function(event)
                 type = 'new_player',
                 name = player.name
             }
-            game.write_file('mini_games/new_player', game.table_to_json(data), false, 0)
+            game.write_file('mini_games/new_player'..math.random(0,4294967296), game.table_to_json(data), false, 0)
             players[player.name] = true
         end
         --Gui stuffs
