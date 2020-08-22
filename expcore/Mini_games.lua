@@ -372,7 +372,8 @@ Event.add(Roles.events.on_role_unassigned, role_event_filter(check_participant_s
 -- Active participants who join after game start will trigger on_participant_joined
 -- Inactive participants (who join before start) will be added to the participants list, or given to participant_selector
 -- Non participants and Inactive participants (who join after start) will be spawned as spectator
-local amount_of_parts = 0
+vars.amount_of_parts = 0
+
 Event.add(defines.events.on_player_joined_game, function(event)
     local player = game.players[event.player_index]
     if vars.is_lobby == true then
@@ -386,11 +387,11 @@ Event.add(defines.events.on_player_joined_game, function(event)
         player.print('You are now in the main lobby.')
     elseif vars.is_lobby == false then
         if Roles.player_has_role(player, 'Participant') then
-            amount_of_parts = amount_of_parts + 1
-            if amount_of_parts ~= 0 then
+            vars.amount_of_parts = vars.amount_of_parts + 1
+            if vars.amount_of_parts ~= 0 then
                 local data = {
                     type = "player_count_changed",
-                    amount = amount_of_parts,
+                    amount = vars.amount_of_parts,
                 }
                 game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
             end
@@ -419,10 +420,10 @@ Event.add(defines.events.on_player_left_game, function(event)
     local started = primitives.state == 'Started'
     local participant = Roles.player_has_role(player, 'Participant')
     if participant then
-        amount_of_parts = amount_of_parts - 1
+        vars.amount_of_parts = vars.amount_of_parts - 1
         local data = {
             type = "player_count_changed",
-            amount = amount_of_parts,
+            amount = vars.amount_of_parts,
         }
         game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
     end
@@ -1033,10 +1034,9 @@ Gui.element(function(_,parent,name,maxPlayer,currentPlayer, address)
 	local label = parent.add{
         type    = "label",
         style   = "heading_1_label",
-        caption =  '        '..currentPlayer..' / '..maxPlayer..' Players',
-        name = address
+        caption =  currentPlayer..' / '..maxPlayer..' Players'
     }
-    label.style.left_padding = 15
+    label.style.left_padding = 20
 end)
 
 --lobby to select a game to join
@@ -1048,7 +1048,7 @@ Gui.element(function(event_trigger,parent)
     Gui.header(container, "Game-Lobby", "You can find a game here.")
 
     -- Add the scroll table
-	local scroll_table = Gui.scroll_table(container, 250, 1)
+	local scroll_table = Gui.scroll_table(container, 250, 3)
 	local scroll_table_style = scroll_table.style
 	scroll_table_style.padding = {3, 3}
 	scroll_table_style.top_cell_padding = 3

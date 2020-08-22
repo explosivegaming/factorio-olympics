@@ -286,7 +286,7 @@ local function redraw_player_list()
         end
 
         for name in pairs(game.forces) do
-            local scroll_table = section(container, name, 2).parent
+            local scroll_table = container[name]
             local header = container[name..'-header']
 
             if not forces[name] then
