@@ -1025,15 +1025,16 @@ Gui.element(function(_,parent,name,maxPlayer,currentPlayer, address)
     start_flow.style.padding = 0
     join_button(start_flow)
 	lobby_list[name] = {name = name, address = address}
-    start_flow.add{
+    parent.add{
         type    = "label",
         style   = "heading_1_label",
         caption = name:gsub('_', ' '):lower():gsub('(%l)(%w+)', function(a,b) return string.upper(a)..b end)
     }
-	local label = start_flow.add{
+	local label = parent.add{
         type    = "label",
         style   = "heading_1_label",
-        caption =  '        '..currentPlayer..' / '..maxPlayer..' Players'
+        caption =  '        '..currentPlayer..' / '..maxPlayer..' Players',
+        name = address
     }
     label.style.left_padding = 15
 end)
@@ -1072,6 +1073,10 @@ end
 Mini_games.set_online_player_count =
 function(amount,ip)
     online_player_list[ip] = amount
+    for i , player in ipairs(game.connected_players) do
+        local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
+        gui_table[ip].caption = amount..' / 4 Players'
+    end
     Mini_games.server_list_updated()
 end
 

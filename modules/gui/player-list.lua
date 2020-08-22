@@ -274,6 +274,11 @@ local function redraw_player_list()
         local frame = Gui.get_left_element(player, player_list_container)
         local container = frame.container
 
+        for name in pairs(game.forces) do
+            local scroll_table =  container[name] or section(container, name, 2).parent
+            scroll_table.table.clear()
+        end
+
         local forces = {}
         for _, next_player_data in ipairs(player_list_order) do
             forces[next_player_data.force] = true
@@ -281,13 +286,8 @@ local function redraw_player_list()
         end
 
         for name in pairs(game.forces) do
-            local scroll_table = container[name]
+            local scroll_table = section(container, name, 2).parent
             local header = container[name..'-header']
-            if not scroll_table then
-                scroll_table = section(container, name, 2).parent
-                header = container[name..'-header']
-            end
-            scroll_table.table.clear()
 
             if not forces[name] then
                 scroll_table.visible = false
