@@ -358,21 +358,41 @@ local function check_participant_selector_leave(player)
         xpcall(mini_game.participant_selector, internal_error, player, true)
     end
 end
+vars.amount_of_parts = 0
+
+local function part_role_added(player)
+    vars.amount_of_parts = vars.amount_of_parts + 1
+    local data = {
+        type = "player_count_changed",
+        amount = vars.amount_of_parts,
+    }
+    game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
+    check_participant_selector_join(player)
+end
+
+local function part_role_removed(player)
+    vars.amount_of_parts = vars.amount_of_parts - 1
+    local data = {
+        type = "player_count_changed",
+        amount = vars.amount_of_parts,
+    }
+    game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
+    check_participant_selector_leave(player)
+end
 
 --- Triggered when a player is assigned new roles, and the player has joined the server once before
 -- Non participants who gain the role before game start will be added to the participants list
 -- Non participants who gain the role after game start will not be added to the participants list
-Event.add(Roles.events.on_role_assigned, role_event_filter(check_participant_selector_join))
+Event.add(Roles.events.on_role_assigned, role_event_filter(part_role_added))
 
 --- Triggered when a player is unassigned from roles, and the player has joined the server once before
 -- Participants who lose the role will be removed from the participants list, if they are on it
-Event.add(Roles.events.on_role_unassigned, role_event_filter(check_participant_selector_leave))
+Event.add(Roles.events.on_role_unassigned, role_event_filter(part_role_removed))
 
 --- Triggered when a player joins the game, will trigger on_participant_joined if there is a game running
 -- Active participants who join after game start will trigger on_participant_joined
 -- Inactive participants (who join before start) will be added to the participants list, or given to participant_selector
 -- Non participants and Inactive participants (who join after start) will be spawned as spectator
-vars.amount_of_parts = 0
 
 Event.add(defines.events.on_player_joined_game, function(event)
     local player = game.players[event.player_index]
@@ -388,13 +408,11 @@ Event.add(defines.events.on_player_joined_game, function(event)
     elseif vars.is_lobby == false then
         if Roles.player_has_role(player, 'Participant') then
             vars.amount_of_parts = vars.amount_of_parts + 1
-            if vars.amount_of_parts ~= 0 then
-                local data = {
-                    type = "player_count_changed",
-                    amount = vars.amount_of_parts,
-                }
-                game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
-            end
+            local data = {
+                type = "player_count_changed",
+                amount = vars.amount_of_parts,
+            }
+            game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
         end
         player.print('You are now a the game server.')
     end
