@@ -362,9 +362,28 @@ Event.add(Roles.events.on_role_unassigned, role_event_filter(check_participant_s
 -- Active participants who join after game start will trigger on_participant_joined
 -- Inactive participants (who join before start) will be added to the participants list, or given to participant_selector
 -- Non participants and Inactive participants (who join after start) will be spawned as spectator
+local players = {}
+
 Event.add(defines.events.on_player_joined_game, function(event)
     local player = game.players[event.player_index]
     if vars.is_lobby == true then
+        --Gui stuffs
+        local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
+        for _ , key in pairs(gui_table.children_names) do
+            Gui.destroy_if_valid(gui_table[key])
+        end
+        for ip, name in pairs(global.running_servers) do
+            add_DataLobby(gui_table, name, require_player_list[ip], online_player_list[ip], ip)
+        end
+
+        if not players[player.name] then
+            local data = {
+                type = 'new_player',
+                name = player.name
+            }
+            game.write_file('mini_games/new_player', game.table_to_json(data), false, 0)
+            players[player.name] = true
+        end
         player.print('You are now in the main lobby.')
     elseif vars.is_lobby == false then
         player.print('You are now in a private server.')
