@@ -372,14 +372,13 @@ Event.add(Roles.events.on_role_unassigned, role_event_filter(check_participant_s
 -- Active participants who join after game start will trigger on_participant_joined
 -- Inactive participants (who join before start) will be added to the participants list, or given to participant_selector
 -- Non participants and Inactive participants (who join after start) will be spawned as spectator
+local amount_of_parts = 0
 Event.add(defines.events.on_player_joined_game, function(event)
     local player = game.players[event.player_index]
     if vars.is_lobby == true then
         --Gui stuffs
         local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
-        for _ , key in pairs(gui_table.children_names) do
-            Gui.destroy_if_valid(gui_table[key])
-        end
+        gui_table.clear()
         for ip, name in pairs(global.running_servers) do
             add_DataLobby(gui_table, name, require_player_list[ip], online_player_list[ip], ip)
         end
@@ -387,13 +386,7 @@ Event.add(defines.events.on_player_joined_game, function(event)
         player.print('You are now in the main lobby.')
     elseif vars.is_lobby == false then
         if Roles.player_has_role(player, 'Participant') then
-            local amount_of_parts = 0
-            for i , player_to_check in ipairs(game.connected_players) do
-                local participant = Roles.player_has_role(player_to_check, 'Participant')
-                if participant then
-                    amount_of_parts = amount_of_parts + 1
-                end
-            end
+            amount_of_parts = amount_of_parts + 1
             if amount_of_parts ~= 0 then
                 local data = {
                     type = "player_count_changed",
@@ -402,7 +395,7 @@ Event.add(defines.events.on_player_joined_game, function(event)
                 game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
             end
         end
-        player.print('You are now in the game server.')
+        player.print('You are now a the game server.')
     end
 
     local started = primitives.state == 'Started'
@@ -426,20 +419,12 @@ Event.add(defines.events.on_player_left_game, function(event)
     local started = primitives.state == 'Started'
     local participant = Roles.player_has_role(player, 'Participant')
     if participant then
-        local amount_of_parts = 0
-        for i , player_to_check in ipairs(game.connected_players) do
-            local _participant = Roles.player_has_role(player_to_check, 'Participant')
-            if _participant then
-                amount_of_parts = amount_of_parts + 1
-            end
-        end
-        if amount_of_parts ~= 0 then
-            local data = {
-                type = "player_count_changed",
-                amount = amount_of_parts,
-            }
-            game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
-        end
+        amount_of_parts = amount_of_parts - 1
+        local data = {
+            type = "player_count_changed",
+            amount = amount_of_parts,
+        }
+        game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
     end
     if started and Mini_games.is_participant(player) then
         dlog('Participant left:', player.name)
@@ -485,7 +470,7 @@ local function start_from_lobby(name, player_count, args)
     for index, player in pairs(game.connected_players) do
         player.connect_to_server{
             address = server_address,
-            name = '\n[color=red]Factorio Olympics: '..clean_name..'[/color]\n',
+            name = '\n[font=heading-1][color=red]Factorio Olympics: '..clean_name..'[/color][/font]\n',
             description = 'In order to participate you must be transferred to a private server, please press the connect button below to do so.'
         }
     end
@@ -772,9 +757,11 @@ function Mini_games.stop_game()
     end
 
     -- Remove all participants from the game, this also places them into spectator
+    -- Done in reverse as its removing elements form the table
     local amount = #participants
     for i = amount, 1, -1 do
-        local player = participants[i]
+        --is one so the remove_participant does not have to search (this shood not be an i)
+        local player = participants[1]
         Mini_games.remove_participant(player)
     end
     -- Disable all events for this mini game
@@ -874,7 +861,7 @@ Commands.new_command('lobby_all', 'Send everyone to the lobby server.')
     for _, player in ipairs(game.connected_players) do
         player.connect_to_server{
             address = global.servers["lobby"],
-            name = '\n[color=red]Factorio Olympics: '.."lobby"..'[/color]\n',
+            name = '\n[font=heading-1][color=red]Factorio Olympics: '.."lobby"..'[/color][/font]\n',
             description = 'The game is over you must go back to the lobby.'
         }
     end
@@ -1025,7 +1012,7 @@ Gui.element{
     local lobbyData = lobby_list[index]
     player.connect_to_server{
         address = lobbyData.address,
-        name = '\n[color=red]Factorio Olympics: '..lobbyData.name..'[/color]\n',
+        name = '\n[font=heading-1][color=red]Factorio Olympics: '..lobbyData.name..'[/color][/font]\n',
         description = 'In order to participate you must be transferred to a private server, please press the connect button below to do so.'
     }
 end)
@@ -1043,21 +1030,12 @@ Gui.element(function(_,parent,name,maxPlayer,currentPlayer, address)
         style   = "heading_1_label",
         caption = name:gsub('_', ' '):lower():gsub('(%l)(%w+)', function(a,b) return string.upper(a)..b end)
     }
-	start_flow.add{
+	local label = start_flow.add{
         type    = "label",
         style   = "heading_1_label",
-        caption =  '        '..currentPlayer
+        caption =  '        '..currentPlayer..' / '..maxPlayer..' Players'
     }
-	start_flow.add{
-        type    = "label",
-        style   = "heading_1_label",
-        caption = ' / '
-    }
-	start_flow.add{
-        type    = "label",
-        style   = "heading_1_label",
-        caption =  maxPlayer.. ' Players'
-    }
+    label.style.left_padding = 15
 end)
 
 --lobby to select a game to join
@@ -1084,9 +1062,7 @@ function ()
     lobby_list = {}
     for i , player in ipairs(game.connected_players) do
         local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
-        for _ , key in pairs(gui_table.children_names) do
-            Gui.destroy_if_valid(gui_table[key])
-        end
+        gui_table.clear()
         for ip, name in pairs(global.running_servers) do
             add_DataLobby(gui_table, name, require_player_list[ip], online_player_list[ip], ip)
         end
