@@ -4,6 +4,8 @@
 ]]
 
 local Commands = require 'expcore.commands' --- @dep expcore.commands
+local Task = require "utils.task"
+local Token = require 'utils.token'
 require 'config.expcore.command_role_parse'
 
 --- Prompt the player to join a different server
@@ -40,18 +42,20 @@ Commands.new_command('connect', 'Connect a player to another server, option to s
         end
     end
 end)
-
+local handler = Token.register(function (player)
+    player.connect_to_server{
+        address = global.servers["lobby"],
+        name = '\n[font=heading-1][color=red]Factorio Olympics: '.."lobby"..'[/color][/font]\n',
+        description = 'The game is over you must go back to the lobby.'
+    }
+end)
 --- Connect to the lobby server
 -- @command lobby
 Commands.new_command('lobby', 'Connect back to the lobby server')
 :add_alias('hub')
 :register(function(player)
     if global.servers["lobby"] then
-        player.connect_to_server{
-            address = global.servers["lobby"],
-            name = '\n[font=heading-1][color=red]Factorio Olympics: '.."lobby"..'[/color][/font]\n',
-            description = 'The game is over you must go back to the lobby.'
-        }
+        Task.set_timeout_in_ticks(1, handler, player)
     else
         return Commands.error('The address of the lobby server is currently unknown, please leave the game and join via the server browser.')
     end
