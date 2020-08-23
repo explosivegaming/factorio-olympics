@@ -359,21 +359,41 @@ local function check_participant_selector_leave(player)
         xpcall(mini_game.participant_selector, internal_error, player, true)
     end
 end
+vars.amount_of_parts = 0
+
+local function part_role_added(player)
+    vars.amount_of_parts = vars.amount_of_parts + 1
+    local data = {
+        type = "player_count_changed",
+        amount = vars.amount_of_parts,
+    }
+    game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
+    check_participant_selector_join(player)
+end
+
+local function part_role_removed(player)
+    vars.amount_of_parts = vars.amount_of_parts - 1
+    local data = {
+        type = "player_count_changed",
+        amount = vars.amount_of_parts,
+    }
+    game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
+    check_participant_selector_leave(player)
+end
 
 --- Triggered when a player is assigned new roles, and the player has joined the server once before
 -- Non participants who gain the role before game start will be added to the participants list
 -- Non participants who gain the role after game start will not be added to the participants list
-Event.add(Roles.events.on_role_assigned, role_event_filter(check_participant_selector_join))
+Event.add(Roles.events.on_role_assigned, role_event_filter(part_role_added))
 
 --- Triggered when a player is unassigned from roles, and the player has joined the server once before
 -- Participants who lose the role will be removed from the participants list, if they are on it
-Event.add(Roles.events.on_role_unassigned, role_event_filter(check_participant_selector_leave))
+Event.add(Roles.events.on_role_unassigned, role_event_filter(part_role_removed))
 
 --- Triggered when a player joins the game, will trigger on_participant_joined if there is a game running
 -- Active participants who join after game start will trigger on_participant_joined
 -- Inactive participants (who join before start) will be added to the participants list, or given to participant_selector
 -- Non participants and Inactive participants (who join after start) will be spawned as spectator
-local amount_of_parts = 0
 
 Event.add(defines.events.on_player_created, function(event)
     local player = game.players[event.player_index]
@@ -387,6 +407,7 @@ end)
 
 Event.add(defines.events.on_player_joined_game, function(event)
     local player = game.players[event.player_index]
+    local participant = Roles.player_has_role(player, 'Participant')
     if vars.is_lobby == true then
         --Gui stuffs
         local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
@@ -397,21 +418,18 @@ Event.add(defines.events.on_player_joined_game, function(event)
 
         player.print('You are now in the main lobby.')
     elseif vars.is_lobby == false then
-        if Roles.player_has_role(player, 'Participant') then
-            amount_of_parts = amount_of_parts + 1
-            if amount_of_parts ~= 0 then
-                local data = {
-                    type = "player_count_changed",
-                    amount = amount_of_parts,
-                }
-                game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
-            end
+        if participant then
+            vars.amount_of_parts = vars.amount_of_parts + 1
+            local data = {
+                type = "player_count_changed",
+                amount = vars.amount_of_parts,
+            }
+            game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
         end
         player.print('You are now a the game server.')
     end
 
     local started = primitives.state == 'Started'
-    local participant = Roles.player_has_role(player, 'Participant')
     if participant and Mini_games.is_participant(player) then
         dlog('Participant joined:', player.name)
         if started then raise_event('on_participant_joined', player) end
@@ -431,10 +449,10 @@ Event.add(defines.events.on_player_left_game, function(event)
     local started = primitives.state == 'Started'
     local participant = Roles.player_has_role(player, 'Participant')
     if participant then
-        amount_of_parts = amount_of_parts - 1
+        vars.amount_of_parts = vars.amount_of_parts - 1
         local data = {
             type = "player_count_changed",
-            amount = amount_of_parts,
+            amount = vars.amount_of_parts,
         }
         game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
     end
@@ -1037,17 +1055,17 @@ Gui.element(function(_,parent,name,maxPlayer,currentPlayer, address)
     start_flow.style.padding = 0
     join_button(start_flow)
 	lobby_list[name] = {name = name, address = address}
-    start_flow.add{
+    parent.add{
         type    = "label",
         style   = "heading_1_label",
         caption = name:gsub('_', ' '):lower():gsub('(%l)(%w+)', function(a,b) return string.upper(a)..b end)
     }
-	local label = start_flow.add{
+	local label = parent.add{
         type    = "label",
         style   = "heading_1_label",
-        caption =  '        '..currentPlayer..' / '..maxPlayer..' Players'
+        caption =  currentPlayer..' / '..maxPlayer..' Players'
     }
-    label.style.left_padding = 15
+    label.style.left_padding = 20
 end)
 
 --lobby to select a game to join
@@ -1059,7 +1077,7 @@ Gui.element(function(event_trigger,parent)
     Gui.header(container, "Game-Lobby", "You can find a game here.")
 
     -- Add the scroll table
-	local scroll_table = Gui.scroll_table(container, 250, 1)
+	local scroll_table = Gui.scroll_table(container, 250, 3)
 	local scroll_table_style = scroll_table.style
 	scroll_table_style.padding = {3, 3}
 	scroll_table_style.top_cell_padding = 3
@@ -1084,7 +1102,10 @@ end
 Mini_games.set_online_player_count =
 function(amount,ip)
     online_player_list[ip] = amount
-    Mini_games.server_list_updated()
+    for i , player in ipairs(game.connected_players) do
+        local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
+        gui_table[ip].caption = amount..' / 4 Players'
+    end
 end
 
 
