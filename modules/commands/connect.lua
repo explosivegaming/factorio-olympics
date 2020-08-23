@@ -3,18 +3,14 @@
     @commands Connect
 ]]
 
-local Event = require 'utils.event' --- @dep utils.event
 local Commands = require 'expcore.commands' --- @dep expcore.commands
+local Task = require "utils.task"
+local Token = require 'utils.token'
 require 'config.expcore.command_role_parse'
-
-local servers
-Event.on_load(function()
-    servers = global.servers or {}
-end)
 
 --- Prompt the player to join a different server
 local function connect(player, address, default_name)
-    local name = servers[address] and servers[address].name or default_name
+    local name = global.servers[address] and global.servers[address].name or default_name
     player.connect_to_server({
         address = address,
         name = '\n[color=red]'..name..'[/color]\n',
@@ -33,9 +29,9 @@ Commands.new_command('connect', 'Connect a player to another server, option to s
 :add_alias('server', 'send-to')
 :register(function(_, address, player)
     local default_name = 'Factorio Olympic Server'
-    if servers[address] then
+    if global.servers[address] then
         default_name = address
-        address = servers[address]
+        address = global.servers[address]
         if type(address) == 'table' then address = address[1] end
     end
     if player then
@@ -46,15 +42,20 @@ Commands.new_command('connect', 'Connect a player to another server, option to s
         end
     end
 end)
-
+local handler = Token.register(function (player)
+    player.connect_to_server{
+        address = global.servers["lobby"],
+        name = '\n[font=heading-1][color=red]Factorio Olympics: '.."lobby"..'[/color][/font]\n',
+        description = 'The game is over you must go back to the lobby.'
+    }
+end)
 --- Connect to the lobby server
 -- @command lobby
 Commands.new_command('lobby', 'Connect back to the lobby server')
 :add_alias('hub')
 :register(function(player)
-    local address = servers.lobby
-    if address then
-        connect(player, address, 'Lobby')
+    if global.servers["lobby"] then
+        Task.set_timeout_in_ticks(1, handler, player)
     else
         return Commands.error('The address of the lobby server is currently unknown, please leave the game and join via the server browser.')
     end
