@@ -18,19 +18,19 @@ Gui.events.on_visibility_changed_by_click = 'on_visibility_changed_by_click'
 -- @table left_elements
 Gui.left_elements = {}
 
---[[-- Gets the flow refered to as the left flow, each player has one left flow
+--[[-- Gets the flow refereed to as the left flow, each player has one left flow
 @function Gui.get_left_flow(player)
 @tparam LuaPlayer player the player that you want to get the left flow for
 @treturn LuaGuiElement the left element flow
 
-@usage-- Geting your left flow
+@usage-- Getting your left flow
 local left_flow = Gui.get_left_flow(game.player)
 
 ]]
 Gui.get_left_flow = mod_gui.get_frame_flow
 
 --[[-- Sets an element define to be drawn to the left flow when a player joins, includes optional check
-@tparam[opt] ?boolean|function open_on_join called during first darw to decide if the element should be visible
+@tparam[opt] ?boolean|function open_on_join called during first draw to decide if the element should be visible
 @treturn table the new element define that is used to register events to this element
 
 @usage-- Adding the example button
@@ -58,8 +58,8 @@ end)
 function Gui.left_toolbar_button(sprite, tooltip, element_define, authenticator)
     local button = Gui.toolbar_button(sprite, tooltip, authenticator)
 
-    -- Add on_click handler to handle click events comming from the player
-    button:on_click(function(player, _,_)
+    -- Add on_click handler to handle click events coming from the player
+    button:on_click(function(player, _, _)
         local top_flow = Gui.get_top_flow(player)
         local element = top_flow[button.name]
         local visibility_state  = Gui.toggle_left_element(player, element_define)
@@ -115,13 +115,13 @@ function Gui.draw_left_flow(player)
         left_element.visible = visible
         show_hide_button = show_hide_button or visible
 
-        -- Get the assosiated element define
+        -- Get the associated element define
         local element_define = Gui.defines[name]
         local top_flow = Gui.get_top_flow(player)
 
         -- Check if the the element has a button attached
         if element_define.toolbar_button then
-            -- Check if the topflow contains the button
+            -- Check if the top flow contains the button
             local button = top_flow[element_define.toolbar_button]
             if button then
                 -- Style the button
@@ -133,15 +133,48 @@ function Gui.draw_left_flow(player)
     hide_button.visible = show_hide_button
 end
 
---[[-- Update the visible state of the hide button, can be used to check if any frames are visible
+--[[-- Update the visible state of all left elements which have a toolbar button connected
 @tparam LuaPlayer player the player to update the left flow for
 @treturn boolean true if any left element is visible
 
-@usage-- Check if any left elements are visible
-local visible = Gui.update_left_flow(player)
+@usage-- Update the visible state of left elements with attached toolbar button
+Gui.update_left_flow(player)
 
 ]]
 function Gui.update_left_flow(player)
+    local top_flow = Gui.get_top_flow(player)
+    local left_flow = Gui.get_left_flow(player)
+    local hide_button = left_flow.gui_core_buttons[hide_left_flow]
+    local hide_visible = false
+
+    for name, element_define in pairs(Gui.left_elements) do
+        local left_element = left_flow[name]
+        if element_define.toolbar_button then
+            -- If there if a toolbar button then check if its visible
+            local button = top_flow[element_define.toolbar_button]
+            if not button or not button.visible then
+                left_element.visible = false
+            end
+        end
+        -- Check if the hide button should be visible
+        if left_element.visible then
+            hide_visible = true
+        end
+    end
+
+    hide_button.visible = hide_visible
+    return hide_visible
+end
+
+--[[-- Update the visible state of the hide button, can be used to check if any frames are visible
+@tparam LuaPlayer player the player to update the left hide button for
+@treturn boolean true if any left element is visible
+
+@usage-- Check if any left elements are visible
+local visible = Gui.update_left_core_button(player)
+
+]]
+function Gui.update_left_core_button(player)
     local left_flow = Gui.get_left_flow(player)
     local hide_button = left_flow.gui_core_buttons[hide_left_flow]
     for name, _ in pairs(Gui.left_elements) do
@@ -172,10 +205,10 @@ function Gui.hide_left_flow(player)
     for name, _ in pairs(Gui.left_elements) do
         left_flow[name].visible = false
 
-        -- Check if the the element has a toobar button attached
+        -- Check if the the element has a toolbar button attached
         local element_define = Gui.defines[name]
         if element_define.toolbar_button then
-            -- Check if the topflow contains the button
+            -- Check if the top flow contains the button
             local button = top_flow[element_define.toolbar_button]
             if button then
                 -- Style the button
@@ -193,7 +226,7 @@ function Gui.hide_left_flow(player)
     end
 end
 
---[[-- Get the element define that is in the left flow, use in events without an element refrence
+--[[-- Get the element define that is in the left flow, use in events without an element reference
 @tparam LuaPlayer player the player that you want to get the element for
 @tparam table element_define the element that you want to get
 @treturn LuaGuiElement the gui element linked to this define for this player
@@ -228,11 +261,11 @@ function Gui.toggle_left_element(player, element_define, state)
     local element = left_flow[element_define.name]
     if state == nil then state = not element.visible end
     element.visible = state
-    Gui.update_left_flow(player)
+    Gui.update_left_core_button(player)
 
     -- Check if the the element has a button attached
     if element_define.toolbar_button then
-        -- Check if the topflow contains the button
+        -- Check if the top flow contains the button
         local button = top_flow[element_define.toolbar_button]
         if button then
             -- Style the button
