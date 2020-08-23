@@ -147,7 +147,8 @@ function Gui.update_left_flow(player)
     local hide_button = left_flow.gui_core_buttons[hide_left_flow]
     local hide_visible = false
 
-    for name, element_define in pairs(Gui.left_elements) do
+    for name, _ in pairs(Gui.left_elements) do
+        local element_define = Gui.defines[name]
         local left_element = left_flow[name]
         if element_define.toolbar_button then
             -- If there if a toolbar button then check if its visible

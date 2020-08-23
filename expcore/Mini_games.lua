@@ -22,6 +22,7 @@ local Mini_games = {
     available  = {},
     events = {
         on_participant_added = script.generate_event_name(),
+        on_participant_created = script.generate_event_name(),
         on_participant_joined = script.generate_event_name(),
         on_participant_left = script.generate_event_name(),
         on_participant_removed = script.generate_event_name()
@@ -416,14 +417,17 @@ Event.add(defines.events.on_player_joined_game, function(event)
     end
 
     local started = primitives.state == 'Started'
-    if participant and Mini_games.is_participant(player) then
+    if participant and started and Mini_games.is_participant(player) then
         dlog('Participant joined:', player.name)
-        if started then raise_event('on_participant_joined', player) end
+        raise_event('on_participant_joined', player)
+        return PermissionGroups.set_player_group(player, 'InGame')
     elseif participant and not started then
         check_participant_selector_join(player)
     elseif primitives.current_game then
         Mini_games.respawn_spectator(player)
     end
+
+    PermissionGroups.set_player_group(player, 'Lobby')
 end)
 
 --- Triggered when a player leaves the game, will trigger on_participant_left if there is a game running
@@ -524,9 +528,12 @@ local start_game = Token.register(function(timeout_nonce)
     end
 
     -- Raises on_participant_joined for all participants in the game
+    local permission_group = PermissionGroups.get_group_by_name('InGame')
     for _, player in ipairs(participants) do
         dlog('Participant joined:', player.name)
+        raise_event('on_participant_created', player)
         raise_event('on_participant_joined', player)
+        permission_group:add_player(player)
     end
 
     -- Calls on_start core event to start the game
@@ -723,9 +730,11 @@ local close_game = Token.register(function(timeout_nonce)
     set_internal_state('Closing')
 
     -- Move all players to the lobby, and remove and selector if present
+    local permission_group = PermissionGroups.get_group_by_name('Lobby')
     local selector = mini_game.participant_selector
     for _, player in ipairs(game.connected_players) do
         Mini_games.respawn_spectator(player)
+        permission_group:add_player(player)
         if selector then
             dlog('Remove selector:', player.name)
             xpcall(selector, internal_error, player, true)
@@ -1084,7 +1093,7 @@ function Mini_games.server_list_updated()
     end
 
     -- If there is only one server for a game remove the suffix
-    for name, count in pairs(first) do
+    for name, count in pairs(game_count) do
         if count == 1 then
             global.running_servers[first[name]] = name
         end

@@ -183,7 +183,7 @@ local function on_player_added(event)
 end
 
 --- When a player joins place them into their car
-local function on_player_joined(event)
+local function on_player_created(event)
     local player = game.players[event.player_index]
     local car = cars[player.name]
     local pos = car.surface.find_non_colliding_position('character', car.position, 6, 1)
@@ -524,6 +524,6 @@ race:add_event(defines.events.on_entity_died, car_destroyed)
 race:add_event(defines.events.on_player_driving_changed_state, back_in_car)
 
 race:add_event(Mini_games.events.on_participant_added, on_player_added)
-race:add_event(Mini_games.events.on_participant_joined, on_player_joined)
+race:add_event(Mini_games.events.on_participant_created, on_player_created)
 race:add_event(Mini_games.events.on_participant_left, on_player_left)
 race:add_event(Mini_games.events.on_participant_removed, on_player_removed)
