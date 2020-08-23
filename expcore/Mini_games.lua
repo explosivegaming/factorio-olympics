@@ -12,8 +12,6 @@ local Commands = require 'expcore.commands'
 require 'config.expcore.command_runtime_disable' --required to load before running the script
 
 --- Locals
-local add_DataLobby
-local lobby
 local require_player_list = {}
 local online_player_list  = {}
 local WaitingGui = require 'modules.gui.mini_game_waiting'
@@ -408,14 +406,7 @@ Event.add(defines.events.on_player_joined_game, function(event)
     local participant = Roles.player_has_role(player, 'Participant')
     if vars.is_lobby == true then
         player.print('You are now in the main lobby.')
-        -- Clear the lobby gui
-        local gui_table = Gui.get_left_element(player, lobby).container.scroll.table
-        gui_table.clear()
-
-        -- Add all running servers to the table
-        for ip, name in pairs(global.running_servers) do
-            add_DataLobby(gui_table, name, require_player_list[ip], online_player_list[ip], ip)
-        end
+        Mini_games.update_server_list(player)
 
     elseif vars.is_lobby == false then
         player.print('You are now in a game server.')
@@ -993,74 +984,57 @@ Gui.element(function(event_trigger,parent)
 end)
 :add_to_left_flow()
 
-
-
 --- Add a toggle button that can be used when no game is running
 Gui.left_toolbar_button('utility/check_mark', 'Select a mini game to start', mini_game_list, function(player)
     return Roles.player_allowed(player, 'gui/game_start') and (primitives.state == 'Closing' or primitives.state == 'Closed')
 end)
 
-
 ----- Lobby gui
 
-local lobby_list = {}
-local prefix = 1
-local function pick_name(name)
-    if lobby_list[name] ~= nil then
-        local new_name = name..prefix
-        if lobby_list[name] ~= nil then return new_name end
-        prefix = prefix + 1
-        return pick_name(name)
-    else
-        prefix = 1
-        return name
-    end
-end
-
---- Button used to start a mini game
+--- Button used to join a game server
 local join_button =
 Gui.element{
     type = 'sprite-button',
     sprite = 'utility/import',
     style = 'slot_button',
-    tooltip = 'Join game',
-	--name = lobby_counter --should be an integer type
+    tooltip = 'Join game'
 }
 :style(Gui.sprite_style(30))
 :on_click(function(player, element, _)
-    local index = element.parent.name
-    local lobbyData = lobby_list[index]
+    local server_name = element.parent.name
+    local server_address = element.parent.caption
     player.connect_to_server{
-        address = lobbyData.address,
-        name = '\n[font=heading-1][color=red]Factorio Olympics: '..lobbyData.name..'[/color][/font]\n',
+        address = server_address,
+        name = '\n[font=heading-1][color=red]Factorio Olympics: '..server_name..'[/color][/font]\n',
         description = 'In order to participate you must be transferred to a private server, please press the connect button below to do so.'
     }
 end)
 
---- Adds  data to Lobby_table
-add_DataLobby =
-Gui.element(function(_,parent,name,maxPlayer,currentPlayer, address)
-    name = pick_name(name)
-    local start_flow = parent.add{ type = 'flow', name = name }
+--- Adds a game server to the lobby server table
+local add_game_server =
+Gui.element(function(_, parent, name, maxPlayer, currentPlayer, address)
+    local start_flow = parent.add{ type = 'flow', name = name, caption = address }
     start_flow.style.padding = 0
     join_button(start_flow)
-	lobby_list[name] = {name = name, address = address}
+
     parent.add{
         type    = "label",
         style   = "heading_1_label",
         caption = name:gsub('_', ' '):lower():gsub('(%l)(%w+)', function(a,b) return string.upper(a)..b end)
     }
+
 	local label = parent.add{
         type    = "label",
         style   = "heading_1_label",
         caption =  currentPlayer..' / '..maxPlayer..' Players'
     }
     label.style.left_padding = 20
+
 end)
 
---lobby to select a game to join
-lobby =
-Gui.element(function(event_trigger,parent)
+--- Lobby gui which allows you to connect to other game servers
+local lobby =
+Gui.element(function(event_trigger, parent)
     local container = Gui.container(parent,event_trigger,200)
 
     -- Add the header
@@ -1072,20 +1046,53 @@ Gui.element(function(event_trigger,parent)
 	scroll_table_style.padding = {3, 3}
 	scroll_table_style.top_cell_padding = 3
     scroll_table_style.bottom_cell_padding = 3
+
     return container.parent
 end)
 :add_to_left_flow()
 
+--- Adds a button to toggle the lobby server list
+Gui.left_toolbar_button('utility/change_recipe', 'Select a game to join', lobby, function(_)
+    return vars.is_lobby
+end)
+
+--- Called to update the server list for a player
+function Mini_games.update_server_list(player)
+    local gui_table = Gui.get_left_element(player, lobby).container.scroll.table
+    gui_table.clear()
+
+    for ip, name in pairs(global.running_servers) do
+        add_game_server(gui_table, name, require_player_list[ip], online_player_list[ip], ip)
+    end
+end
+
 --- Called from node script to update the server list for all players
 function Mini_games.server_list_updated()
     if not vars.is_lobby then return end
-    lobby_list = {}
-    for i , player in ipairs(game.connected_players) do
-        local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
-        gui_table.clear()
-        for ip, name in pairs(global.running_servers) do
-            add_DataLobby(gui_table, name, require_player_list[ip], online_player_list[ip], ip)
+    local first, game_count = {}, {}
+
+    -- Assign unique names to all the servers
+    for key, name in pairs(global.running_servers) do
+        if not game_count[name] then
+            first[name] = key
+            game_count[name] = 1
+            global.running_servers[key] = name..'1'
+        else
+            game_count[name] = game_count[name] + 1
+            global.running_servers[key] = name..game_count[name]
         end
+    end
+
+    -- If there is only one server for a game remove the suffix
+    for name, count in pairs(first) do
+        if count == 1 then
+            global.running_servers[first[name]] = name
+        end
+    end
+
+    -- Update the gui for all players
+    for _, player in ipairs(game.connected_players) do
+        Mini_games.update_server_list(player)
     end
 end
 
@@ -1094,15 +1101,10 @@ function Mini_games.set_online_player_count(amount, ip)
     online_player_list[ip] = amount
     local caption = amount..' / 4 Players'
     for i , player in ipairs(game.connected_players) do
-        local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
+        local gui_table = Gui.get_left_element(player, lobby).container.scroll.table
         gui_table[ip].caption = caption
     end
 end
-
---- Adds a button to toggle the lobby server list
-Gui.left_toolbar_button('utility/change_recipe', 'Select a game to join', lobby, function(_)
-    return vars.is_lobby
-end)
 
 ----- Module Return -----
 return Mini_games
