@@ -7,14 +7,9 @@ local Event = require 'utils.event' --- @dep utils.event
 local Commands = require 'expcore.commands' --- @dep expcore.commands
 require 'config.expcore.command_role_parse'
 
-local servers
-Event.on_load(function()
-    servers = global.servers or {}
-end)
-
 --- Prompt the player to join a different server
 local function connect(player, address, default_name)
-    local name = servers[address] and servers[address].name or default_name
+    local name = global.servers[address] and global.servers[address].name or default_name
     player.connect_to_server({
         address = address,
         name = '\n[color=red]'..name..'[/color]\n',
@@ -33,9 +28,9 @@ Commands.new_command('connect', 'Connect a player to another server, option to s
 :add_alias('server', 'send-to')
 :register(function(_, address, player)
     local default_name = 'Factorio Olympic Server'
-    if servers[address] then
+    if global.servers[address] then
         default_name = address
-        address = servers[address]
+        address = global.servers[address]
         if type(address) == 'table' then address = address[1] end
     end
     if player then
@@ -52,7 +47,7 @@ end)
 Commands.new_command('lobby', 'Connect back to the lobby server')
 :add_alias('hub')
 :register(function(player)
-    local address = servers.lobby
+    local address = global.servers['lobby']
     if address then
         connect(player, address, 'Lobby')
     else
