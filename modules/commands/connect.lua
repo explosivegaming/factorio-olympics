@@ -46,9 +46,12 @@ end)
 Commands.new_command('lobby', 'Connect back to the lobby server')
 :add_alias('hub')
 :register(function(player)
-    local address = global.servers['lobby']
-    if address then
-        connect(player, address, 'Lobby')
+    if global.servers["lobby"] then
+        player.connect_to_server{
+            address = global.servers["lobby"],
+            name = '\n[font=heading-1][color=red]Factorio Olympics: '.."lobby"..'[/color][/font]\n',
+            description = 'The game is over you must go back to the lobby.'
+        }
     else
         return Commands.error('The address of the lobby server is currently unknown, please leave the game and join via the server browser.')
     end
