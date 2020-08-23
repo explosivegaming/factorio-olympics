@@ -402,6 +402,7 @@ end)
 -- Non participants and Inactive participants (who join after start) will be spawned as spectator
 
 Event.add(defines.events.on_player_created, function(event)
+    if vars.is_lobby then  return end
     local player = game.players[event.player_index]
     local data = {
         type = 'new_player',
