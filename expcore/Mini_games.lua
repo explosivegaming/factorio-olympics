@@ -396,6 +396,7 @@ Event.add(Roles.events.on_role_unassigned, role_event_filter(part_role_removed))
 
 Event.add(defines.events.on_player_joined_game, function(event)
     local player = game.players[event.player_index]
+    local participant = Roles.player_has_role(player, 'Participant')
     if vars.is_lobby == true then
         --Gui stuffs
         local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
@@ -406,7 +407,7 @@ Event.add(defines.events.on_player_joined_game, function(event)
 
         player.print('You are now in the main lobby.')
     elseif vars.is_lobby == false then
-        if Roles.player_has_role(player, 'Participant') then
+        if participant then
             vars.amount_of_parts = vars.amount_of_parts + 1
             local data = {
                 type = "player_count_changed",
@@ -418,7 +419,6 @@ Event.add(defines.events.on_player_joined_game, function(event)
     end
 
     local started = primitives.state == 'Started'
-    local participant = Roles.player_has_role(player, 'Participant')
     if participant and Mini_games.is_participant(player) then
         dlog('Participant joined:', player.name)
         if started then raise_event('on_participant_joined', player) end
