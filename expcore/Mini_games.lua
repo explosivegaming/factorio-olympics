@@ -404,7 +404,7 @@ Event.add(defines.events.on_player_created, function(event)
     game.write_file('mini_games/new_player'..player.name, game.table_to_json(data), false, 0)
 end)
 
-
+vars.amount_of_parts  = 0
 Event.add(defines.events.on_player_joined_game, function(event)
     local player = game.players[event.player_index]
     local participant = Roles.player_has_role(player, 'Participant')
