@@ -41,6 +41,7 @@ gen.register()
 
 global.servers = {}
 global.running_servers = {}
+
 --[[
 global.servers= {
     lobby =  "127.0.0.1:12345"
@@ -373,19 +374,20 @@ Event.add(Roles.events.on_role_unassigned, role_event_filter(check_participant_s
 -- Inactive participants (who join before start) will be added to the participants list, or given to participant_selector
 -- Non participants and Inactive participants (who join after start) will be spawned as spectator
 local amount_of_parts = 0
-local players = {}
+
+Event.add(defines.events.on_player_created, function(event)
+    local player = game.players[event.player_index]
+    local data = {
+        type = 'new_player',
+        name = player.name
+    }
+    game.write_file('mini_games/new_player'..player.name, game.table_to_json(data), false, 0)
+end)
+
 
 Event.add(defines.events.on_player_joined_game, function(event)
     local player = game.players[event.player_index]
     if vars.is_lobby == true then
-        if not players[player.name] then
-            local data = {
-                type = 'new_player',
-                name = player.name
-            }
-            game.write_file('mini_games/new_player'..math.random(0,4294967296), game.table_to_json(data), false, 0)
-            players[player.name] = true
-        end
         --Gui stuffs
         local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
         gui_table.clear()
