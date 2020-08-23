@@ -53,7 +53,8 @@ function Game.get_player_from_any(obj)
     if o_type == 'number' then
         p = Game.get_player_by_index(obj)
     elseif o_type == 'string' then
-        p = game.players[obj]
+        -- Usernames that are numbers above 2^16 may throw an error
+        pcall(function() p = game.players[obj] end)
     elseif o_type == 'table' and obj.valid and obj.is_player() then
         return obj
     end
