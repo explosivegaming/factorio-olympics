@@ -385,11 +385,17 @@ end
 -- Non participants who gain the role before game start will be added to the participants list
 -- Non participants who gain the role after game start will not be added to the participants list
 Event.add(Roles.events.on_role_assigned, role_event_filter(part_role_added))
+Event.add(Roles.events.on_role_assigned, function (event)
+    Gui.update_top_flow(game.players[event.player_index])
+end)
+
 
 --- Triggered when a player is unassigned from roles, and the player has joined the server once before
 -- Participants who lose the role will be removed from the participants list, if they are on it
 Event.add(Roles.events.on_role_unassigned, role_event_filter(part_role_removed))
-
+Event.add(Roles.events.on_role_unassigned, function (event)
+    Gui.update_top_flow(game.players[event.player_index])
+end)
 --- Triggered when a player joins the game, will trigger on_participant_joined if there is a game running
 -- Active participants who join after game start will trigger on_participant_joined
 -- Inactive participants (who join before start) will be added to the participants list, or given to participant_selector
@@ -407,6 +413,7 @@ end)
 vars.amount_of_parts  = 0
 Event.add(defines.events.on_player_joined_game, function(event)
     local player = game.players[event.player_index]
+    Gui.update_top_flow(player)
     local participant = Roles.player_has_role(player, 'Participant')
     if vars.is_lobby == true then
         --Gui stuffs
