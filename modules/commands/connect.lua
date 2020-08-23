@@ -3,7 +3,6 @@
     @commands Connect
 ]]
 
-local Event = require 'utils.event' --- @dep utils.event
 local Commands = require 'expcore.commands' --- @dep expcore.commands
 require 'config.expcore.command_role_parse'
 
