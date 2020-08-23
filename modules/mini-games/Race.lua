@@ -518,6 +518,7 @@ race:set_core_events(on_init, start, stop, on_close)
 race:set_gui(main_gui, gui_callback)
 race:add_surfaces(1, 'Race game')
 race:add_option(2) -- how many options are needed with /start
+race:set_protected(true)
 
 race:add_event(defines.events.on_player_changed_position, player_move)
 race:add_event(defines.events.on_entity_died, car_destroyed)

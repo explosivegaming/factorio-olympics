@@ -240,9 +240,9 @@ local function on_player_created(event)
     -- Teleport the player to the new surface
     if player.character then player.character.destroy() end
     local pos = surface.find_non_colliding_position('character', {0, 0}, 50, 1)
-    player.set_controller{ type = defines.controllers.god }
+    local character = surface.create_entity{ name = 'character', position = pos, force = player.force }
     player.teleport(pos, surface)
-    player.create_character()
+    player.character = character
 
     -- Give the starting starting items
     for _, item in pairs(starting_items) do

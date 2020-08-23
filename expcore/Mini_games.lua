@@ -194,6 +194,12 @@ function Mini_games._prototype:add_command(command_name)
     Commands.disable(command_name)
 end
 
+--- Set this game as protected which means that participants cant mine or place anything
+function Mini_games._prototype:set_protected(state)
+    if state == nil then state = true end
+    self.protected = state
+end
+
 ----- Public Variables -----
 
 --- Get the currently game, returns the mini game object, mostly used internally
@@ -233,19 +239,19 @@ local function raise_event(name, player)
     })
 end
 
---- Respawn a spectator, if a game is running then they are placed in a god controller
+--- Respawn a spectator, if a game is running then they are placed in a spectator controller
 -- If there is a game closing then they will be placed in a character in the lobby
 -- If there if the server is closed nothing will happen as they have already been moved to the lobby
 function Mini_games.respawn_spectator(player)
     Gui.update_top_flow(player)
     if player.character then player.character.destroy() end
-    player.set_controller{ type = defines.controllers.god }
     if primitives.state == 'Closing' or primitives.state == 'Loading' then
         dlog('Respawn in lobby:', player.name)
         local surface = game.surfaces.nauvis
         local pos = surface.find_non_colliding_position('character', {-35, 55}, 6, 1)
+        local character = surface.create_entity{ name = 'character', position = pos, force = player.force }
         player.teleport(pos, surface)
-        player.create_character()
+        player.character = character
     elseif primitives.current_game then
         dlog('Respawn in spectator:', player.name)
         player.set_controller{ type = defines.controllers.spectator }
@@ -301,6 +307,7 @@ function Mini_games.remove_participant(player)
             participants[#participants] = nil
             dlog('Remove participant:', player.name)
             raise_event('on_participant_removed', player)
+            Mini_games.set_permission_group(player, 'Lobby')
             Mini_games.respawn_spectator(player)
             check_participant_count()
             return
@@ -375,6 +382,16 @@ local function change_online_participants(player, remove)
     game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
 end
 
+--- Used to set the permission group of a player, as long as they arnt in the admin group
+function Mini_games.set_permission_group(player, group, is_object)
+    if player.permission_group.name == 'Admin' or Roles.get_player_highest_role(player).permission_group == 'Admin' then return end
+    if is_object then
+        group:add_player(player)
+    else
+        PermissionGroups.set_player_group(player, group)
+    end
+end
+
 --- Triggered when a player is assigned to participant, and the player has joined the server once before
 -- Non participants who gain the role before game start will be added to the participants list
 -- Non participants who gain the role after game start will not be added to the participants list
@@ -420,14 +437,15 @@ Event.add(defines.events.on_player_joined_game, function(event)
     if participant and started and Mini_games.is_participant(player) then
         dlog('Participant joined:', player.name)
         raise_event('on_participant_joined', player)
-        return PermissionGroups.set_player_group(player, 'InGame')
+        local mini_game = Mini_games.get_current_game()
+        return Mini_games.set_permission_group(player, mini_game.protected and 'InGameProtected' or 'InGame')
     elseif participant and not started then
         check_participant_selector_join(player)
     elseif primitives.current_game then
         Mini_games.respawn_spectator(player)
     end
 
-    PermissionGroups.set_player_group(player, 'Lobby')
+    Mini_games.set_permission_group(player, 'Lobby')
 end)
 
 --- Triggered when a player leaves the game, will trigger on_participant_left if there is a game running
@@ -528,12 +546,12 @@ local start_game = Token.register(function(timeout_nonce)
     end
 
     -- Raises on_participant_joined for all participants in the game
-    local permission_group = PermissionGroups.get_group_by_name('InGame')
+    local permission_group = PermissionGroups.get_group_by_name(mini_game.protected and 'InGameProtected' or 'InGame')
     for _, player in ipairs(participants) do
         dlog('Participant joined:', player.name)
         raise_event('on_participant_created', player)
         raise_event('on_participant_joined', player)
-        permission_group:add_player(player)
+        Mini_games.set_permission_group(player, permission_group, true)
     end
 
     -- Calls on_start core event to start the game
@@ -730,11 +748,9 @@ local close_game = Token.register(function(timeout_nonce)
     set_internal_state('Closing')
 
     -- Move all players to the lobby, and remove and selector if present
-    local permission_group = PermissionGroups.get_group_by_name('Lobby')
     local selector = mini_game.participant_selector
     for _, player in ipairs(game.connected_players) do
         Mini_games.respawn_spectator(player)
-        permission_group:add_player(player)
         if selector then
             dlog('Remove selector:', player.name)
             xpcall(selector, internal_error, player, true)
@@ -777,7 +793,6 @@ function Mini_games.stop_game()
     end
 
     -- Remove all participants from the game, this also places them into spectator
-    -- Done in reverse as its removing elements form the table
     local amount = #participants
     for i = amount, 1, -1 do
         --is one so the remove_participant does not have to search (this shood not be an i)

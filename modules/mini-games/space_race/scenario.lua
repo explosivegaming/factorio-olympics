@@ -187,10 +187,11 @@ local function on_player_created(event)
     local player = game.players[event.player_index]
 
     if player.character then player.character.destroy() end
+    local surface = MS.get_surface()
     local pos = get_teleport_location(player.force, true)
-    player.set_controller{ type = defines.controllers.god }
-    player.teleport(pos, MS.get_surface())
-    player.create_character()
+    local character = surface.create_entity{ name = 'character', position = pos, force = player.force }
+    player.teleport(pos, surface)
+    player.character = character
 
     for _, item in pairs(starting_items) do
         player.insert(item)
