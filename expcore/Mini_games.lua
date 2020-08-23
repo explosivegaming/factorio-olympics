@@ -1095,7 +1095,6 @@ function(amount,ip)
         local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
         gui_table[ip].caption = amount..' / 4 Players'
     end
-    Mini_games.server_list_updated()
 end
 
 
