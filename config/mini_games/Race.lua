@@ -1,6 +1,6 @@
 return {
     {
-        name = 'Curst curfs',
+        name = 'Curst curves',
         surface_name = 'Race game2';
         start_pos = {
             left = {
