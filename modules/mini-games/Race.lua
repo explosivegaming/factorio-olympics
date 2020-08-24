@@ -535,7 +535,7 @@ end
 local race = Mini_games.new_game("Race_game")
 race:set_core_events(on_init, start, stop, on_close)
 race:set_gui(main_gui, gui_callback)
-race:add_surfaces(1, 'Race game')
+race:add_surfaces(2, 'Race game', 'Race game2')
 race:add_option(3) -- how many options are needed with /start
 
 race:add_event(defines.events.on_player_changed_position, player_move)
