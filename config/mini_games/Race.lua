@@ -1,6 +1,6 @@
 return {
     {
-        name = 'Curst curves', --Cronoks
+        name = 'Cursed Curves', --Cronoks
         surface_name = 'Race game2';
         start_pos = {
             left = {
