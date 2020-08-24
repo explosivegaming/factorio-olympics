@@ -131,7 +131,7 @@ end
 
 --- Called before the game starts and before any players are added
 local function on_init(args)
-    variables["config"] = config[args[3]]
+    variables["config"] = config[tonumber(args[3])]
     surface[1] = game.surfaces[variables["config"].surface_name]
     variables["done_left"]  = 0
     variables["count_down"] = 4
