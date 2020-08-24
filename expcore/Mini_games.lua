@@ -67,7 +67,8 @@ end)
 
 --- Used with xpcall
 local function internal_error(error_message)
-    game.print("Their is an error please contact the admins, error: "..error_message)
+    local err = error_message:gsub('%.%.%..-/temp/currently%-playing', '')
+    game.print("Their is an error please contact the admins, error: "..err)
     log(debug.traceback(error_message))
 end
 

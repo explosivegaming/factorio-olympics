@@ -1,6 +1,6 @@
 return {
     {
-        name = 'Curst curves',
+        name = 'Curst curves', --Cronoks
         surface_name = 'Race game2';
         start_pos = {
             left = {
@@ -15,7 +15,7 @@ return {
         cheater_orentation = 0.5
     },
     {
-        name = 'samy115',
+        name = 'Forest Safari race', --samy115
         surface_name = 'Race game';
         start_pos = {
             left = {
