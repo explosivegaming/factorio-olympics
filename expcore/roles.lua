@@ -943,7 +943,9 @@ function Roles._prototype:get_players(online)
     for player_name, player_roles in pairs(Roles.config.players) do
         for _, role_name in ipairs(player_roles) do
             if role_name == self.name then
-                local player = game.players[player_name]
+                local player
+                -- Usernames that are numbers above 2^16 may throw an error
+                pcall(function() player = game.players[player_name] end)
                 -- Filter by online state if required
                 if player and (online == nil or player.connected == online) then
                     players[#players+1] = player
