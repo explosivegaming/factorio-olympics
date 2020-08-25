@@ -242,6 +242,7 @@ end
 --- Get the position number with the suffix appended
 local function Nth (n) return n..getSuffix(n) end
 
+local result_options = { time_seconds = {minutes = true, seconds = true, long = true, string = true} }
 --- Function called by mini game module to stop a race
 local function stop()
     -- Print the place that each player came
@@ -263,7 +264,7 @@ local function stop()
 
     end
 
-    Mini_games.print_results(results, 'seconds')
+    Mini_games.print_results(results, result_options)
     return results
 end
 

@@ -854,7 +854,7 @@ end
 local function Nth (n) return n..getSuffix(n) end
 
 --- Colours used while printing positions in chat
-local message_format = '%s: %s with %d %s'
+local message_format = '%s: %s with %s'
 local colors =  {
     ["1st"] = { 255, 215, 0   },
     ["2nd"] = { 192, 192, 192 },
@@ -862,16 +862,21 @@ local colors =  {
     default = { 128, 128, 128 }
 }
 
+local format_time = _C.format_time
 --- Print the results to game chat, follows the same requires as returning from on_close with optional names table as an override
-function Mini_games.print_results(results, unit, names, limit)
-    names = names or {}
-    limit = limit or 5
+function Mini_games.print_results(results, options)
+    local names = options.names or {}
+    local limit = options.limit or 5
     for i, result in ipairs(results) do
         if result.place < limit then
-            local place = Nth(result.place)
+            local place, score = Nth(result.place), result.score
             local colour = colors[place] or colors.default
             local name = names[i] or table.concat(result.players, ', ')
-            game.print(message_format:format(place, name, result.score, unit), colour)
+            if     options.time_seconds then score = format_time(score*60, options.time_seconds)
+            elseif options.time_ticks   then score = format_time(score, options.time_ticks)
+            elseif options.format       then score = options.format(score)
+            elseif options.unit         then score = score..' '..options.unit end
+            game.print(message_format:format(place, name, score), colour)
         end
     end
 end

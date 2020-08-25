@@ -167,6 +167,7 @@ end
 
 ----- Game Stop and Close -----
 
+local result_time_options = { hours = true, minutes = true, seconds = true, long = true, string = true }
 --- Called to stop the game and return the results to be saved
 local function stop()
 
@@ -189,7 +190,7 @@ local function stop()
         end
     end
 
-    Mini_games.print_results(results, 'percent', names)
+    Mini_games.print_results(results, { time_seconds = result_time_options, names = names })
     return results
 end
 
@@ -276,7 +277,7 @@ local function update_progress(force, data)
         scores[last] = { name, time, names }
         -- Check if all teams are done
         if last == primitives.team_count then Mini_games.stop_game() end
-end
+    end
 end
 
 --- Checks if an indicator has already been used
@@ -384,11 +385,11 @@ local function check_item_production()
 end
 
 --- Ran every tick to update the timer
-local options = { hours = true, minutes = true, seconds = true, milliseconds = true, time = true, div = 'time-format.simple-format-div-space' }
 local format_time = _C.format_time
+local timer_options = { hours = true, minutes = true, seconds = true, milliseconds = true, time = true, div = 'time-format.simple-format-div-space' }
 local function on_tick()
     local time = game.tick - Mini_games.get_start_time()
-    local format = format_time(time, options)
+    local format = format_time(time, timer_options)
     for _, player in ipairs(game.connected_players) do
         local container = Gui.get_left_element(player, timer_container)
         container.timer.caption = format
