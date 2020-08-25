@@ -11,6 +11,7 @@ local primitives = {}
 local progress   = {}
 local surfaces   = {}
 local forces     = {}
+local scores     = {}
 
 local goals = require 'config.mini_games.speedrun'
 for index, goal in ipairs(goals) do
@@ -42,12 +43,14 @@ Global.register({
     primitives = primitives,
     progress   = progress,
     surfaces   = surfaces,
-    forces     = forces
+    forces     = forces,
+    scores     = scores
 }, function(tbl)
     primitives = tbl.primitives
     progress   = tbl.progress
     surfaces   = tbl.surfaces
     forces     = tbl.forces
+    scores     = tbl.scores
 end)
 
 ----- Local Variables ----
@@ -72,6 +75,7 @@ local function reset_globals()
     reset_table(progress)
     reset_table(surfaces)
     reset_table(forces)
+    reset_table(scores)
 end
 
 ----- Map Gen -----
@@ -136,6 +140,7 @@ local function start()
             force.share_chart = true
             force.chart(surfaces[name], {{x = 80, y = 80}, {x = -80, y = -80}})
         else
+            primitives.team_count = primitives.team_count - 1
             game.merge_forces(force, game.forces.player)
             game.delete_surface(surfaces[name])
             removed[name] = true
@@ -164,19 +169,6 @@ end
 
 --- Called to stop the game and return the results to be saved
 local function stop()
-    local scores, ctn = {}, 0
-    -- Get all the data needed to write results
-    for name, team in pairs(progress) do
-        ctn = ctn + 1
-        local names = {}
-        for index, player in ipairs(forces[name].players) do names[index] = player.name end
-        scores[ctn] = { name, math.floor(team[1]/team[2]*1000)/10, names }
-    end
-
-    -- Sort by team progress
-    table.sort(scores, function(a, b)
-        return a[2] > b[2]
-    end)
 
     -- Format the results table
     local results, names = {}, {}
@@ -265,6 +257,8 @@ local function update_progress(force, data)
     local bar_tooltip = {'', 'Last Completed: ', data[4] or 'None'}
     local label_name, label_value = 'label-'..name, math.floor(bar_value*100)..'%'
     local label_tooltip = 'Progress: '..data[1]..' / '..data[2]
+
+    -- Update the progress gui for all players
     for _, player in pairs(game.players) do
         local container = Gui.get_left_element(player, timer_container)
         local progress_table = container.progress_table
@@ -273,7 +267,16 @@ local function update_progress(force, data)
         progress_table[label_name].caption = label_value
         progress_table[label_name].tooltip = label_tooltip
     end
-    if data[1] == data[2] then Mini_games.stop_game() end
+
+    -- Check if the team has finished
+    if data[1] == data[2] then
+        local names, last = {}, #scores + 1
+        for index, player in ipairs(forces[name].players) do names[index] = player.name end
+        local time = math.floor((game.tick - Mini_games.get_start_time())/60)
+        scores[last] = { name, time, names }
+        -- Check if all teams are done
+        if last == primitives.team_count then Mini_games.stop_game() end
+end
 end
 
 --- Checks if an indicator has already been used
