@@ -131,6 +131,9 @@ end
 
 --- Called before the game starts and before any players are added
 local function on_init(args)
+    if not config[tonumber(args[3])] then
+        return Mini_games.error_in_game("Wrong map name")
+    end
     variables["config"] = config[tonumber(args[3])]
     surface[1] = game.surfaces[variables["config"].surface_name]
     variables["done_left"]  = 0
@@ -189,9 +192,9 @@ end
 --- When a player joins place them into their car
 local function on_player_created(event)
     local player = game.players[event.player_index]
-    player.teleport({0,0}, surface[1])
     local car = cars[player.name]
     local pos = car.surface.find_non_colliding_position('character', car.position, 6, 1)
+    player.teleport(pos, car.surface)
     local character = car.surface.create_entity{name='character', position=pos, force='player'}
     player.set_controller{type = defines.controllers.character, character = character}
     car.set_driver(player)
