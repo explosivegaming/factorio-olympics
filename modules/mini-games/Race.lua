@@ -207,6 +207,14 @@ local function start()
     game.print("Racing in a car with "..variables["fuel"], colour)
     game.print("Laps: "..variables["laps"], colour)
     task.set_timeout_in_ticks(10, race_count_down)
+
+    return {
+        variant = table.concat({
+            variables["config"].name,
+            variables["laps"] .. " Laps",
+            variables["fuel"],
+        }, " | "),
+    }
 end
 
 ----- Game Cleanup -----

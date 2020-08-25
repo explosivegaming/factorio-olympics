@@ -557,9 +557,13 @@ local start_game = Token.register(function(timeout_nonce)
 
     -- Calls on_start core event to start the game
     local on_start = mini_game.core_events.on_start
+    local start_data = {}
     if on_start then
         dlog('Call: On Start')
-        xpcall(on_start, internal_error)
+        local status, result = xpcall(on_start, internal_error)
+        if status and result then
+            start_data = result
+        end
     end
 
     -- Write the game start to file
@@ -567,6 +571,7 @@ local start_game = Token.register(function(timeout_nonce)
         type      = 'started_game',
         players   = Mini_games.get_participant_names(),
         name      = mini_game.name,
+        variant   = start_data.variant,
     }
 
     dlog('Start:', mini_game.name, 'Player Count:', #data.players)
