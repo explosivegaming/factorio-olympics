@@ -272,8 +272,11 @@ local function update_progress(force, data)
     -- Check if the team has finished
     if data[1] == data[2] then
         local names, last = {}, #scores + 1
-        for index, player in ipairs(forces[name].players) do names[index] = player.name end
         local time = math.floor((game.tick - Mini_games.get_start_time())/60)
+        for index, player in ipairs(forces[name].players) do
+            Mini_games.remove_participant(player)
+            names[index] = player.name
+        end
         scores[last] = { name, time, names }
         -- Check if all teams are done
         if last == primitives.team_count then Mini_games.stop_game() end
