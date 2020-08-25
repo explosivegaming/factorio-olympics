@@ -233,27 +233,21 @@ local function on_player_removed(event)
 end
 
 --- Trigger when a participant joins the game
-local function on_player_joined(event)
+local function on_player_created(event)
     local player = game.players[event.player_index]
+    local surface = surfaces[player.force.name]
 
-    if Mini_games.get_current_state() == 'Starting' then
-        local surface = surfaces[player.force.name]
+    -- Teleport the player to the new surface
+    if player.character then player.character.destroy() end
+    local pos = surface.find_non_colliding_position('character', {0, 0}, 50, 1)
+    local character = surface.create_entity{ name = 'character', position = pos, force = player.force }
+    player.teleport(pos, surface)
+    player.character = character
 
-        -- Teleport the player to the new surface
-        if player.character then player.character.destroy() end
-        local pos = surface.find_non_colliding_position('character', {0, 0}, 50, 1)
-        player.set_controller{ type = defines.controllers.god }
-        player.teleport(pos, surface)
-        player.create_character()
-
-        -- Set permission group and give starting items
-        game.permissions.get_group('Default').add_player(player)
-        for _, item in pairs(starting_items) do
-            player.insert(item)
-        end
-
+    -- Give the starting starting items
+    for _, item in pairs(starting_items) do
+        player.insert(item)
     end
-
 end
 
 ----- Events -----
@@ -571,7 +565,7 @@ Speedrun:set_participant_selector(TeamSelector.selector(function() return forces
 Speedrun:set_gui(main_gui, gui_callback)
 Speedrun:add_option(3) -- how many options are needed with /start
 
-Speedrun:add_event(Mini_games.events.on_participant_joined, on_player_joined)
+Speedrun:add_event(Mini_games.events.on_participant_created, on_player_created)
 Speedrun:add_event(Mini_games.events.on_participant_removed, on_player_removed)
 
 Speedrun:add_event(defines.events.on_research_finished, on_research_completed)

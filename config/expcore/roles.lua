@@ -71,7 +71,7 @@ Roles.new_role('Official','Official')
 
 --- Trusted Roles
 Roles.new_role('Partner','Part')
-:set_permission_group('Trusted')
+:set_permission_group('Lobby')
 :set_custom_color{r=241,g=196,b=15}
 :set_flag('is_spectator')
 :set_parent('Guest')
@@ -79,7 +79,7 @@ Roles.new_role('Partner','Part')
 }
 
 Roles.new_role('Team Leader','Leader')
-:set_permission_group('Trusted')
+:set_permission_group('Lobby')
 :set_custom_color{r=241,g=196,b=15}
 :set_flag('is_spectator')
 :set_parent('Participant')
@@ -88,7 +88,7 @@ Roles.new_role('Team Leader','Leader')
 
 --- Standard User Roles
 Roles.new_role('Participant','Player')
-:set_permission_group('Standard')
+:set_permission_group('Lobby')
 :set_custom_color{r=24,g=172,b=188}
 :set_parent('Guest')
 :allow{
@@ -96,7 +96,7 @@ Roles.new_role('Participant','Player')
 
 --- Guest/Default role
 local default = Roles.new_role('Guest','')
-:set_permission_group('Guest')
+:set_permission_group('Lobby')
 :set_custom_color{r=185,g=187,b=160}
 :allow{
     'command/all_votes',

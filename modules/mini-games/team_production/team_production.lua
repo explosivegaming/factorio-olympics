@@ -795,22 +795,19 @@ local function on_player_added(event)
 end
 
 --- Triggered when a participant joins the game
-local function on_player_joined(event)
+local function on_player_created(event)
   local player = game.players[event.player_index]
-  if Mini_games.get_current_state() == 'Starting' then
-    local surface = script_data.surface
+  local surface = script_data.surface
 
-    -- Teleport the player to the new surface
-    if player.character then player.character.destroy() end
-    local pos = surface.find_non_colliding_position('character', player.force.get_spawn_position(surface), 10, 2)
-    local character = surface.create_entity{ name = 'character', position = pos, force = player.force }
-    player.teleport(pos, surface)
-    player.character = character
+  -- Teleport the player to the new surface
+  if player.character then player.character.destroy() end
+  local pos = surface.find_non_colliding_position('character', player.force.get_spawn_position(surface), 10, 2)
+  local character = surface.create_entity{ name = 'character', position = pos, force = player.force }
+  player.teleport(pos, surface)
+  player.character = character
 
-    -- Set permission group and give starting items
-    game.permissions.get_group('Default').add_player(player)
-    give_equipment(player)
-  end
+  -- Give starting items
+  give_equipment(player)
 end
 
 --- Trigger when a participant is removed from the game
@@ -924,7 +921,7 @@ team_production:set_gui(main_gui, gui_callback)
 team_production:add_option(1) -- how many options are needed with /start
 
 team_production:add_event(Mini_games.events.on_participant_added, on_player_added)
-team_production:add_event(Mini_games.events.on_participant_joined, on_player_joined)
+team_production:add_event(Mini_games.events.on_participant_created, on_player_created)
 team_production:add_event(Mini_games.events.on_participant_removed, on_player_removed)
 
 team_production:add_event(defines.events.on_pre_player_left_game, on_pre_player_left_game)

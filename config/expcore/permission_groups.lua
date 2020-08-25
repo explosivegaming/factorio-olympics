@@ -25,7 +25,7 @@ Permission_Groups.new_group('Admin')
     'set_infinity_pipe_filter'
 }
 
-Permission_Groups.new_group('Trusted')
+Permission_Groups.new_group('InGame')
 :allow_all()
 :disallow{
     'add_permission_group', -- admin
@@ -40,10 +40,10 @@ Permission_Groups.new_group('Trusted')
     'set_infinity_container_filter_item',
     'set_infinity_container_remove_unfiltered_items',
     'set_infinity_pipe_filter',
-    'admin_action' -- trusted
+    'admin_action' -- in game
 }
 
-Permission_Groups.new_group('Standard')
+Permission_Groups.new_group('InGameProtected')
 :allow_all()
 :disallow{
     'add_permission_group', -- admin
@@ -58,41 +58,67 @@ Permission_Groups.new_group('Standard')
     'set_infinity_container_filter_item',
     'set_infinity_container_remove_unfiltered_items',
     'set_infinity_pipe_filter',
-    'admin_action', -- trusted
-    'change_programmable_speaker_alert_parameters', -- standard
-    'set_auto_launch_rocket'
-}
-
-Permission_Groups.new_group('Guest')
-:allow_all()
-:disallow{
-    'add_permission_group', -- admin
-    'delete_permission_group',
-    'edit_permission_group',
-    'import_permissions_string',
-    'map_editor_action',
-    'toggle_map_editor',
-    'change_multiplayer_config',
-    'set_heat_interface_mode',
-    'set_heat_interface_temperature',
-    'set_infinity_container_filter_item',
-    'set_infinity_container_remove_unfiltered_items',
-    'set_infinity_pipe_filter',
-    'admin_action', -- trusted
-    'change_programmable_speaker_alert_parameters', -- standard
-    'set_auto_launch_rocket',
-    'change_programmable_speaker_parameters', -- guest
-    'drop_item',
-    'change_train_stop_station',
+    'admin_action', -- in game
+    'activate_copy', -- in game protected
+    'activate_cut',
+    'activate_paste',
+    'begin_mining',
+    'begin_mining_terrain',
+    'build_item',
+    'build_terrain',
+    'copy',
+    'create_blueprint_like',
     'deconstruct',
+    'drop_item',
     'remove_cables',
-    'remove_train_station',
-    'reset_assembling_machine',
     'rotate_entity',
-    'use_artillery_remote',
-    'launch_rocket',
-    'cancel_research',
-    'activate_cut'
+    'setup_blueprint',
+    'undo',
+    'upgrade'
+}
+
+Permission_Groups.new_group('Lobby')
+:allow_all()
+:disallow{
+    'add_permission_group', -- admin
+    'delete_permission_group',
+    'edit_permission_group',
+    'import_permissions_string',
+    'map_editor_action',
+    'toggle_map_editor',
+    'change_multiplayer_config',
+    'set_heat_interface_mode',
+    'set_heat_interface_temperature',
+    'set_infinity_container_filter_item',
+    'set_infinity_container_remove_unfiltered_items',
+    'set_infinity_pipe_filter',
+    'admin_action', -- in game
+    'activate_copy', -- lobby
+    'activate_cut',
+    'activate_paste',
+    'begin_mining',
+    'begin_mining_terrain',
+    'build_item',
+    'build_terrain',
+    'copy',
+    'craft',
+    'create_blueprint_like',
+    'deconstruct',
+    'drop_item',
+    'open_achievements_gui',
+    'open_blueprint_library_gui',
+    'open_bonus_gui',
+    'open_character_gui',
+    'open_logistic_gui',
+    'open_production_gui',
+    'open_technology_gui',
+    'open_trains_gui',
+    'open_tutorials_gui',
+    'remove_cables',
+    'rotate_entity',
+    'setup_blueprint',
+    'undo',
+    'upgrade'
 }
 
 Permission_Groups.new_group('Restricted')
