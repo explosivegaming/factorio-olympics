@@ -187,7 +187,7 @@ local function on_player_added(event)
 end
 
 --- When a player joins place them into their car
-local function on_player_joined(event)
+local function on_player_created(event)
     local player = game.players[event.player_index]
     player.teleport({0,0}, surface[1])
     local car = cars[player.name]
@@ -535,6 +535,7 @@ end
 local race = Mini_games.new_game("Race_game")
 race:set_core_events(on_init, start, stop, on_close)
 race:set_gui(main_gui, gui_callback)
+race:set_protected(true)
 race:add_surfaces(2, 'Race game', 'Race game2')
 race:add_option(3) -- how many options are needed with /start
 
@@ -543,6 +544,6 @@ race:add_event(defines.events.on_entity_died, car_destroyed)
 race:add_event(defines.events.on_player_driving_changed_state, back_in_car)
 
 race:add_event(Mini_games.events.on_participant_added, on_player_added)
-race:add_event(Mini_games.events.on_participant_joined, on_player_joined)
+race:add_event(Mini_games.events.on_participant_created, on_player_created)
 race:add_event(Mini_games.events.on_participant_left, on_player_left)
 race:add_event(Mini_games.events.on_participant_removed, on_player_removed)

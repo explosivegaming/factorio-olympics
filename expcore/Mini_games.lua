@@ -6,13 +6,12 @@ local gen = require 'utils.map_gen.generate'
 
 --- Expcore
 local Gui = require 'expcore.gui'
-local Roles = require 'expcore.roles' --- @dep expcore.roles
+local Roles = require 'expcore.roles'
+local PermissionGroups = require 'expcore.permission_groups'
 local Commands = require 'expcore.commands'
 require 'config.expcore.command_runtime_disable' --required to load before running the script
 
 --- Locals
-local add_DataLobby
-local lobby
 local require_player_list = {}
 local online_player_list  = {}
 local WaitingGui = require 'modules.gui.mini_game_waiting'
@@ -23,6 +22,7 @@ local Mini_games = {
     available  = {},
     events = {
         on_participant_added = script.generate_event_name(),
+        on_participant_created = script.generate_event_name(),
         on_participant_joined = script.generate_event_name(),
         on_participant_left = script.generate_event_name(),
         on_participant_removed = script.generate_event_name()
@@ -195,6 +195,12 @@ function Mini_games._prototype:add_command(command_name)
     Commands.disable(command_name)
 end
 
+--- Set this game as protected which means that participants cant mine or place anything
+function Mini_games._prototype:set_protected(state)
+    if state == nil then state = true end
+    self.protected = state
+end
+
 ----- Public Variables -----
 
 --- Get the currently game, returns the mini game object, mostly used internally
@@ -234,19 +240,19 @@ local function raise_event(name, player)
     })
 end
 
---- Respawn a spectator, if a game is running then they are placed in a god controller
+--- Respawn a spectator, if a game is running then they are placed in a spectator controller
 -- If there is a game closing then they will be placed in a character in the lobby
 -- If there if the server is closed nothing will happen as they have already been moved to the lobby
 function Mini_games.respawn_spectator(player)
     Gui.update_top_flow(player)
     if player.character then player.character.destroy() end
-    player.set_controller{ type = defines.controllers.god }
     if primitives.state == 'Closing' or primitives.state == 'Loading' then
         dlog('Respawn in lobby:', player.name)
         local surface = game.surfaces.nauvis
         local pos = surface.find_non_colliding_position('character', {-35, 55}, 6, 1)
+        local character = surface.create_entity{ name = 'character', position = pos, force = player.force }
         player.teleport(pos, surface)
-        player.create_character()
+        player.character = character
     elseif primitives.current_game then
         dlog('Respawn in spectator:', player.name)
         player.set_controller{ type = defines.controllers.spectator }
@@ -302,6 +308,7 @@ function Mini_games.remove_participant(player)
             participants[#participants] = nil
             dlog('Remove participant:', player.name)
             raise_event('on_participant_removed', player)
+            Mini_games.set_permission_group(player, 'Lobby')
             Mini_games.respawn_spectator(player)
             check_participant_count()
             return
@@ -360,92 +367,86 @@ local function check_participant_selector_leave(player)
         xpcall(mini_game.participant_selector, internal_error, player, true)
     end
 end
+
 vars.amount_of_parts = 0
+--- Used to update the online participant count which is shown in the lobby server
+local function change_online_participants(player, remove)
+    if remove then
+        dlog('Participant left server:', player.name)
+        vars.amount_of_parts = vars.amount_of_parts - 1
+    else
+        dlog('Participant joined server:', player.name)
+        vars.amount_of_parts = vars.amount_of_parts + 1
+    end
 
-local function part_role_added(player)
-    vars.amount_of_parts = vars.amount_of_parts + 1
-    local data = {
-        type = "player_count_changed",
-        amount = vars.amount_of_parts,
-    }
+    local data = { type = 'player_count_changed', amount = vars.amount_of_parts }
     game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
-    check_participant_selector_join(player)
 end
 
-local function part_role_removed(player)
-    vars.amount_of_parts = vars.amount_of_parts - 1
-    local data = {
-        type = "player_count_changed",
-        amount = vars.amount_of_parts,
-    }
-    game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
-    check_participant_selector_leave(player)
+--- Used to set the permission group of a player, as long as they arnt in the admin group
+function Mini_games.set_permission_group(player, group, is_object)
+    if player.permission_group.name == 'Admin' or Roles.get_player_highest_role(player).permission_group == 'Admin' then return end
+    if is_object then
+        group:add_player(player)
+    else
+        PermissionGroups.set_player_group(player, group)
+    end
 end
 
---- Triggered when a player is assigned new roles, and the player has joined the server once before
+--- Triggered when a player is assigned to participant, and the player has joined the server once before
 -- Non participants who gain the role before game start will be added to the participants list
 -- Non participants who gain the role after game start will not be added to the participants list
-Event.add(Roles.events.on_role_assigned, role_event_filter(part_role_added))
-Event.add(Roles.events.on_role_assigned, function (event)
-    Gui.update_top_flow(game.players[event.player_index])
-end)
+Event.add(Roles.events.on_role_assigned, role_event_filter(function(player)
+    check_participant_selector_join(player)
+    change_online_participants(player)
+end))
 
-
---- Triggered when a player is unassigned from roles, and the player has joined the server once before
+--- Triggered when a player is unassigned from participant, and the player has joined the server once before
 -- Participants who lose the role will be removed from the participants list, if they are on it
-Event.add(Roles.events.on_role_unassigned, role_event_filter(part_role_removed))
-Event.add(Roles.events.on_role_unassigned, function (event)
-    Gui.update_top_flow(game.players[event.player_index])
+Event.add(Roles.events.on_role_unassigned, role_event_filter(function(player)
+    check_participant_selector_leave(player)
+    change_online_participants(player, true)
+end))
+
+--- Trigger when a player join the game for the first time, this will allow for automatic sign up for the games
+Event.add(defines.events.on_player_created, function(event)
+    if not vars.is_lobby then return end
+    local player = game.players[event.player_index]
+    local data = { type = 'new_player', name = player.name }
+    game.write_file('mini_games/new_player_'..player.name, game.table_to_json(data), false, 0)
 end)
+
 --- Triggered when a player joins the game, will trigger on_participant_joined if there is a game running
 -- Active participants who join after game start will trigger on_participant_joined
 -- Inactive participants (who join before start) will be added to the participants list, or given to participant_selector
 -- Non participants and Inactive participants (who join after start) will be spawned as spectator
-
-Event.add(defines.events.on_player_created, function(event)
-    local player = game.players[event.player_index]
-    local data = {
-        type = 'new_player',
-        name = player.name
-    }
-    game.write_file('mini_games/new_player'..player.name, game.table_to_json(data), false, 0)
-end)
-
-vars.amount_of_parts  = 0
 Event.add(defines.events.on_player_joined_game, function(event)
     local player = game.players[event.player_index]
-    Gui.update_top_flow(player)
     local participant = Roles.player_has_role(player, 'Participant')
     if vars.is_lobby == true then
-        --Gui stuffs
-        local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
-        gui_table.clear()
-        for ip, name in pairs(global.running_servers) do
-            add_DataLobby(gui_table, name, require_player_list[ip], online_player_list[ip], ip)
-        end
-
         player.print('You are now in the main lobby.')
+        Mini_games.update_server_list(player)
+
     elseif vars.is_lobby == false then
+        player.print('You are now in a game server.')
         if participant then
-            vars.amount_of_parts = vars.amount_of_parts + 1
-            local data = {
-                type = "player_count_changed",
-                amount = vars.amount_of_parts,
-            }
-            game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
+            change_online_participants(player)
         end
-        player.print('You are now a the game server.')
     end
 
     local started = primitives.state == 'Started'
-    if participant and Mini_games.is_participant(player) then
+    if participant and started and Mini_games.is_participant(player) then
         dlog('Participant joined:', player.name)
-        if started then raise_event('on_participant_joined', player) end
+        raise_event('on_participant_joined', player)
+        local mini_game = Mini_games.get_current_game()
+        return Mini_games.set_permission_group(player, mini_game.protected and 'InGameProtected' or 'InGame')
     elseif participant and not started then
         check_participant_selector_join(player)
     elseif primitives.current_game then
         Mini_games.respawn_spectator(player)
     end
+
+    Mini_games.set_permission_group(player, 'Lobby')
 end)
 
 --- Triggered when a player leaves the game, will trigger on_participant_left if there is a game running
@@ -457,12 +458,7 @@ Event.add(defines.events.on_player_left_game, function(event)
     local started = primitives.state == 'Started'
     local participant = Roles.player_has_role(player, 'Participant')
     if participant then
-        vars.amount_of_parts = vars.amount_of_parts - 1
-        local data = {
-            type = "player_count_changed",
-            amount = vars.amount_of_parts,
-        }
-        game.write_file('mini_games/player_count_changed', game.table_to_json(data), false, 0)
+        change_online_participants(player, true)
     end
     if started and Mini_games.is_participant(player) then
         dlog('Participant left:', player.name)
@@ -551,9 +547,12 @@ local start_game = Token.register(function(timeout_nonce)
     end
 
     -- Raises on_participant_joined for all participants in the game
+    local permission_group = PermissionGroups.get_group_by_name(mini_game.protected and 'InGameProtected' or 'InGame')
     for _, player in ipairs(participants) do
         dlog('Participant joined:', player.name)
+        raise_event('on_participant_created', player)
         raise_event('on_participant_joined', player)
+        Mini_games.set_permission_group(player, permission_group, true)
     end
 
     -- Calls on_start core event to start the game
@@ -795,7 +794,6 @@ function Mini_games.stop_game()
     end
 
     -- Remove all participants from the game, this also places them into spectator
-    -- Done in reverse as its removing elements form the table
     local amount = #participants
     for i = amount, 1, -1 do
         --is one so the remove_participant does not have to search (this shood not be an i)
@@ -1011,74 +1009,57 @@ Gui.element(function(event_trigger,parent)
 end)
 :add_to_left_flow()
 
-
-
 --- Add a toggle button that can be used when no game is running
 Gui.left_toolbar_button('utility/check_mark', 'Select a mini game to start', mini_game_list, function(player)
     return Roles.player_allowed(player, 'gui/game_start') and (primitives.state == 'Closing' or primitives.state == 'Closed')
 end)
 
-
 ----- Lobby gui
 
-local lobby_list = {}
-local perfix = 1
-local function pick_name(name)
-    if lobby_list[name] ~= nil then
-        local new_name = name..perfix
-        if lobby_list[name] ~= nil then return new_name end
-        perfix = perfix + 1
-        return pick_name(name)
-    else
-        perfix = 1
-        return name
-    end
-end
-
---- Button used to start a mini game
+--- Button used to join a game server
 local join_button =
 Gui.element{
     type = 'sprite-button',
     sprite = 'utility/import',
     style = 'slot_button',
-    tooltip = 'Join game',
-	--name = lobby_counter --should be an integer type
+    tooltip = 'Join game'
 }
 :style(Gui.sprite_style(30))
 :on_click(function(player, element, _)
-    local index = element.parent.name
-    local lobbyData = lobby_list[index]
+    local server_name = element.parent.name
+    local server_address = element.parent.caption
     player.connect_to_server{
-        address = lobbyData.address,
-        name = '\n[font=heading-1][color=red]Factorio Olympics: '..lobbyData.name..'[/color][/font]\n',
+        address = server_address,
+        name = '\n[font=heading-1][color=red]Factorio Olympics: '..server_name..'[/color][/font]\n',
         description = 'In order to participate you must be transferred to a private server, please press the connect button below to do so.'
     }
 end)
 
---- Adds  data to Lobby_table
-add_DataLobby =
-Gui.element(function(_,parent,name,maxPlayer,currentPlayer, address)
-    name = pick_name(name)
-    local start_flow = parent.add{ type = 'flow', name = name }
+--- Adds a game server to the lobby server table
+local add_game_server =
+Gui.element(function(_, parent, name, maxPlayer, currentPlayer, address)
+    local start_flow = parent.add{ type = 'flow', name = name, caption = address }
     start_flow.style.padding = 0
     join_button(start_flow)
-	lobby_list[name] = {name = name, address = address}
+
     parent.add{
         type    = "label",
         style   = "heading_1_label",
         caption = name:gsub('_', ' '):lower():gsub('(%l)(%w+)', function(a,b) return string.upper(a)..b end)
     }
+
 	local label = parent.add{
         type    = "label",
         style   = "heading_1_label",
         caption =  currentPlayer..' / '..maxPlayer..' Players'
     }
     label.style.left_padding = 20
+
 end)
 
---lobby to select a game to join
-lobby =
-Gui.element(function(event_trigger,parent)
+--- Lobby gui which allows you to connect to other game servers
+local lobby =
+Gui.element(function(event_trigger, parent)
     local container = Gui.container(parent,event_trigger,200)
 
     -- Add the header
@@ -1090,36 +1071,65 @@ Gui.element(function(event_trigger,parent)
 	scroll_table_style.padding = {3, 3}
 	scroll_table_style.top_cell_padding = 3
     scroll_table_style.bottom_cell_padding = 3
+
     return container.parent
 end)
 :add_to_left_flow()
 
-Mini_games.server_list_updated =
-function ()
-    if vars.is_lobby ~= true then return end
-    lobby_list = {}
-    for i , player in ipairs(game.connected_players) do
-        local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
-        gui_table.clear()
-        for ip, name in pairs(global.running_servers) do
-            add_DataLobby(gui_table, name, require_player_list[ip], online_player_list[ip], ip)
-        end
-    end
-end
-
-Mini_games.set_online_player_count =
-function(amount,ip)
-    online_player_list[ip] = amount
-    for i , player in ipairs(game.connected_players) do
-        local gui_table = Gui.get_left_element(player,lobby).container.scroll.table
-        gui_table[ip].caption = amount..' / 4 Players'
-    end
-end
-
-
+--- Adds a button to toggle the lobby server list
 Gui.left_toolbar_button('utility/change_recipe', 'Select a game to join', lobby, function(_)
     return vars.is_lobby
 end)
+
+--- Called to update the server list for a player
+function Mini_games.update_server_list(player)
+    local gui_table = Gui.get_left_element(player, lobby).container.scroll.table
+    gui_table.clear()
+
+    for ip, name in pairs(global.running_servers) do
+        add_game_server(gui_table, name, require_player_list[ip], online_player_list[ip], ip)
+    end
+end
+
+--- Called from node script to update the server list for all players
+function Mini_games.server_list_updated()
+    if not vars.is_lobby then return end
+    local first, game_count = {}, {}
+
+    -- Assign unique names to all the servers
+    for key, name in pairs(global.running_servers) do
+        if not game_count[name] then
+            first[name] = key
+            game_count[name] = 1
+            global.running_servers[key] = name..'1'
+        else
+            game_count[name] = game_count[name] + 1
+            global.running_servers[key] = name..game_count[name]
+        end
+    end
+
+    -- If there is only one server for a game remove the suffix
+    for name, count in pairs(game_count) do
+        if count == 1 then
+            global.running_servers[first[name]] = name
+        end
+    end
+
+    -- Update the gui for all players
+    for _, player in ipairs(game.connected_players) do
+        Mini_games.update_server_list(player)
+    end
+end
+
+--- Used to set the online participant count for a game server, updates all guis to reflect the change
+function Mini_games.set_online_player_count(amount, ip)
+    online_player_list[ip] = amount
+    local caption = amount..' / 4 Players'
+    for i , player in ipairs(game.connected_players) do
+        local gui_table = Gui.get_left_element(player, lobby).container.scroll.table
+        gui_table[ip].caption = caption
+    end
+end
 
 ----- Module Return -----
 return Mini_games

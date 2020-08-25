@@ -8,7 +8,6 @@
 local Gui = require 'expcore.gui' --- @dep expcore.gui
 local Roles = require 'expcore.roles' --- @dep expcore.roles
 local Mini_games = require 'expcore.Mini_games' --- @dep expcore.Mini_games
-local Game = require 'utils.game' --- @dep utils.game
 local Event = require 'utils.event' --- @dep utils.event
 local Colors = require 'utils.color_presets' --- @dep utils.color_presets
 local format_time = _C.format_time --- @dep expcore.common
@@ -42,7 +41,7 @@ Gui.element(function(event_trigger, parent, player_data)
 end)
 :on_click(function(player, element, event)
     local selected_player_name = element.caption
-    local selected_player = Game.get_player_from_any(selected_player_name)
+    local selected_player = game.players[selected_player_name]
     if event.button == defines.mouse_button_type.left then
         -- LMB will open the map to the selected player
         if player.character then

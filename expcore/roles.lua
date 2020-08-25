@@ -943,7 +943,9 @@ function Roles._prototype:get_players(online)
     for player_name, player_roles in pairs(Roles.config.players) do
         for _, role_name in ipairs(player_roles) do
             if role_name == self.name then
-                local player = game.players[player_name]
+                local player
+                -- Usernames that are numbers above 2^16 may throw an error
+                pcall(function() player = game.players[player_name] end)
                 -- Filter by online state if required
                 if player and (online == nil or player.connected == online) then
                     players[#players+1] = player
@@ -997,10 +999,11 @@ end
 Event.add(Roles.events.on_role_assigned, role_update)
 Event.add(Roles.events.on_role_unassigned, role_update)
 Event.add(defines.events.on_player_joined_game, role_update)
+
 -- Every 60 seconds the auto promote check is preformed
 Event.on_nth_tick(3600, function()
     local promotes = {}
-    for _, player in pairs(game.connected_players) do
+    for _, player in ipairs(game.connected_players) do
         for _, role in pairs(Roles.config.roles) do
             if role.auto_promote_condition then
                 local success, err = pcall(role.auto_promote_condition, player)

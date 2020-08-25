@@ -183,22 +183,19 @@ end
 
 --- When a player joins teleport them to there base, if start of game then give them a character
 local get_teleport_location
-local function on_player_joined(event)
+local function on_player_created(event)
     local player = game.players[event.player_index]
 
-    if Mini_games.get_current_state() == 'Starting' then
-        if player.character then player.character.destroy() end
-        local pos = get_teleport_location(player.force, true)
-        player.set_controller{ type = defines.controllers.god }
-        player.teleport(pos, MS.get_surface())
-        player.create_character()
+    if player.character then player.character.destroy() end
+    local surface = MS.get_surface()
+    local pos = get_teleport_location(player.force, true)
+    local character = surface.create_entity{ name = 'character', position = pos, force = player.force }
+    player.teleport(pos, surface)
+    player.character = character
 
-        game.permissions.get_group('Default').add_player(player)
-        for _, item in pairs(starting_items) do
-            player.insert(item)
-        end
+    for _, item in pairs(starting_items) do
+        player.insert(item)
     end
-
 end
 
 --- Tile map used to produce the two out of map walls
@@ -529,7 +526,7 @@ space_race:set_participant_selector(TeamSelector.selector(Public.get_teams), tru
 space_race:set_gui(main_gui, gui_callback)
 space_race:add_option(3)
 
-space_race:add_event(Mini_games.events.on_participant_joined, on_player_joined)
+space_race:add_event(Mini_games.events.on_participant_created, on_player_created)
 space_race:add_event(Mini_games.events.on_participant_removed, on_player_removed)
 
 space_race:add_event(defines.events.on_rocket_launched, on_rocket_launched)
