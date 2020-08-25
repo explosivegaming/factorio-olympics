@@ -5,6 +5,7 @@ local Permission_Groups = require "expcore.permission_groups"
 local Global            = require 'utils.global' --Used to prevent desyncing.
 local interface         = require 'modules.commands.interface'
 local Gui               = require 'expcore.gui._require'
+local config = require "config.mini_games.Race"
 
 local surface = {}
 local gates = {}
@@ -16,7 +17,6 @@ local variables = {}
 local scores = {}
 local laps = {}
 local gate_boxes = {}
-
 --- Register a new permission group for players not in cars
 Permission_Groups.new_group('out_car')
 :disallow_all()
@@ -74,6 +74,9 @@ local function reset_globals()
     reset_table(dead_cars)
     reset_table(scores)
     reset_table(laps)
+    reset_table(areas)
+    reset_table(gate_boxes)
+    reset_table(gates)
 end
 
 ----- Game Setup -----
@@ -128,7 +131,11 @@ end
 
 --- Called before the game starts and before any players are added
 local function on_init(args)
-    surface[1] = game.surfaces["Race game"]
+    if not config[tonumber(args[3])] then
+        return Mini_games.error_in_game("Wrong map name")
+    end
+    variables["config"] = config[tonumber(args[3])]
+    surface[1] = game.surfaces[variables["config"].surface_name]
     variables["done_left"]  = 0
     variables["count_down"] = 4
     variables["done_right"] = 0
@@ -137,7 +144,6 @@ local function on_init(args)
     variables["laps"]       = tonumber(args[2])
     variables["place"]      = 1
     scores["finish_times"]  = {}
-
     -- Error if no lap count was given
     if not variables["laps"] then
         return Mini_games.error_in_game("No lap count given")
@@ -159,12 +165,13 @@ local function on_player_added(event)
     local name = player.name
 
     local pos
+    local postions = table.deep_copy(variables["config"].start_pos)
     if variables["left"] then
-        pos = {-85, -126 + variables["done_left"] * 5}
+        pos = {postions.left.x, postions.left.y + variables["done_left"] * 5}
         variables["done_left"] = variables["done_left"] + 1
         variables["left"] = false
     else
-        pos = {-75, -126 + variables["done_right"] * 5}
+        pos = {postions.right.x, postions.right.y + variables["done_right"] * 5}
         variables["done_right"] = variables["done_right"] + 1
         variables["left"] = true
     end
@@ -187,6 +194,7 @@ local function on_player_created(event)
     local player = game.players[event.player_index]
     local car = cars[player.name]
     local pos = car.surface.find_non_colliding_position('character', car.position, 6, 1)
+    player.teleport(pos, car.surface)
     local character = car.surface.create_entity{name='character', position=pos, force='player'}
     player.set_controller{type = defines.controllers.character, character = character}
     car.set_driver(player)
@@ -313,12 +321,13 @@ local function player_move(event)
     if insideBox(gate_boxes[4], pos) then
         if progress < 5 then
             local car = cars[name]
+            local valid_car_pos = surface[1].find_non_colliding_position_in_box('car', areas[1], 0.5)
             if car and car.valid then
-                car.teleport{276,-406}
-                car.orientation = 0.25
+                car.teleport(valid_car_pos)
+                car.orientation = variables['config'].cheater_orentation
             else
-                dead_cars[name].position = {276,-406}
-                dead_cars[name].orientation = 0.25
+                dead_cars[name].position = valid_car_pos
+                dead_cars[name].orientation = variables['config'].cheater_orentation
             end
             player_progress[name] = 1
             player.print("[font=default-bold]YOU CAN'T TAKE A SHORTCUT, CHEATER![/font]")
@@ -477,6 +486,16 @@ Gui.element{
     tooltip = 'Fuel'
 }
 
+--- Used to select what map to play on
+-- @element map_dropdown
+local map_dropdown=
+Gui.element{
+    type = 'drop-down',
+    items = {config[1].name, config[2].name},
+    selected_index = 1,
+    tooltip = 'Map'
+}
+
 --- Used to select the number of laps to complete
 -- @element text_field_for_laps
 local text_field_for_laps =
@@ -494,6 +513,7 @@ Gui.element{
 -- @element main_gui
 local main_gui =
 Gui.element(function(_,parent)
+    map_dropdown(parent)
     fuel_dropdown(parent)
     text_field_for_laps(parent)
 end)
@@ -509,6 +529,8 @@ local function gui_callback(parent)
     local required_laps = parent[text_field_for_laps.name].text
     args[2] = required_laps
 
+    dropdown = parent[map_dropdown.name]
+    args[3] = dropdown.selected_index
     return args
 end
 
@@ -516,9 +538,9 @@ end
 local race = Mini_games.new_game("Race_game")
 race:set_core_events(on_init, start, stop, on_close)
 race:set_gui(main_gui, gui_callback)
-race:add_surfaces(1, 'Race game')
-race:add_option(2) -- how many options are needed with /start
 race:set_protected(true)
+race:add_surfaces(2, 'Race game', 'Race game2')
+race:add_option(3) -- how many options are needed with /start
 
 race:add_event(defines.events.on_player_changed_position, player_move)
 race:add_event(defines.events.on_entity_died, car_destroyed)
