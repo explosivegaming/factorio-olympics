@@ -143,7 +143,7 @@ local function on_init(args)
     variables["fuel"]       = args[1]
     variables["laps"]       = tonumber(args[2])
     variables["place"]      = 1
-    scores["finish_times"]  = {}
+    variables["finish_times"] = {}
     -- Error if no lap count was given
     if not variables["laps"] then
         return Mini_games.error_in_game("No lap count given")
@@ -231,7 +231,6 @@ local function on_player_removed(event)
 
     -- Clear any stored data
     local name = player.name
-    scores[name] = nil
     player_progress[name] = nil
     if player.character then
         player.character.destructible = true
@@ -260,25 +259,43 @@ local function Nth (n) return n..getSuffix(n) end
 
 --- Function called by mini game module to stop a race
 local function stop()
-    -- Print the place that each player came
     local results = {}
-    for name, value in pairs(scores["finish_times"]) do
-        local time = value[2]
+    local results_by_name = {}
 
-        local up_result = results[#results]
-        if up_result and up_result.score == math.round(time, 2) then
-            up_result.players[#up_result.players + 1] = name
+    -- Add scores for players that finished the game
+    for name, result in pairs(variables["finish_times"]) do
+        results[#results + 1] = {
+            place = result.place,
+            score = math.round(result.time, 2),
+            players = {name}
+        }
+        results_by_name[name] = results[#results]
 
-        else
-            results[#results + 1] = {
-                place = value[1],
-                score = math.round(time, 2),
-                players = {name}
-            }
+        -- Correct placement in case of score ties
+        if #results > 1 then
+            local prev = results[#results - 1]
+            local curr = results[#results]
+            if curr.score == prev.score then
+                curr.place = prev.place
+            end
         end
-
     end
 
+    -- Add additional score data for all participants
+    for name, score in pairs(scores) do
+        if not results_by_name[name] then
+            results[#results + 1] = { players = {name} }
+            results_by_name[name] = results[#results]
+        end
+
+        if score.laps then
+            results_by_name[name].extra = {
+                laps = score.laps,
+            }
+        end
+    end
+
+    -- Print the place that each player came
     Mini_games.print_results(results, 'seconds')
     return results
 end
@@ -360,6 +377,13 @@ local function player_move(event)
             game.print(lap_format:format(name, lap_time, laps[name], variables["laps"]))
             scores[name].time = game.tick
 
+            -- Store lap time
+            if scores[name].laps then
+                scores[name].laps[laps[name]] = math.round(lap_time, 2)
+            else
+                scores[name].laps = { math.round(lap_time, 2) }
+            end
+
             -- Add the lap to the total
             if scores[name].total_time then
                 scores[name].total_time = math.round(scores[name].total_time + lap_time, 4)
@@ -376,7 +400,7 @@ local function player_move(event)
 
                 -- Print and update finish times
                 game.print(finish_format:format(name, scores[name].total_time, Nth(variables["place"])))
-                scores["finish_times"][name] = { variables["place"], scores[name].total_time }
+                variables["finish_times"][name] = { place = variables["place"], time = scores[name].total_time }
                 variables["place"] = variables["place"] + 1
 
                 -- If all players have finished then end the game

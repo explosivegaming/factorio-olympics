@@ -871,7 +871,7 @@ function Mini_games.print_results(results, unit, names, limit)
     names = names or {}
     limit = limit or 5
     for i, result in ipairs(results) do
-        if result.place < limit then
+        if result.place and result.place < limit then
             local place = Nth(result.place)
             local colour = colors[place] or colors.default
             local name = names[i] or table.concat(result.players, ', ')
