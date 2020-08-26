@@ -214,6 +214,11 @@ local function start()
             variables["laps"] .. " Laps",
             variables["fuel"],
         }, " | "),
+        extra = {
+            name = variables["config"].name,
+            laps = variables["laps"],
+            fuel = variables["fuel"],
+        }
     }
 end
 

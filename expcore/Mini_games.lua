@@ -572,6 +572,7 @@ local start_game = Token.register(function(timeout_nonce)
         players   = Mini_games.get_participant_names(),
         name      = mini_game.name,
         variant   = start_data.variant,
+        extra     = start_data.extra,
     }
 
     dlog('Start:', mini_game.name, 'Player Count:', #data.players)
