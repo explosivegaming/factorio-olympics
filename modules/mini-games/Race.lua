@@ -270,18 +270,20 @@ local function stop()
     local results_by_name = {}
 
     -- Add scores for players that finished the game
+    local last = 0
     for name, result in pairs(variables["finish_times"]) do
-        results[#results + 1] = {
+        local curr = {
             place = result.place,
             score = math.round(result.time, 2),
             players = {name}
         }
-        results_by_name[name] = results[#results]
+        last = last + 1
+        results[last] = curr
+        results_by_name[name] = curr
 
         -- Correct placement in case of score ties
-        if #results > 1 then
-            local prev = results[#results - 1]
-            local curr = results[#results]
+        if last > 1 then
+            local prev = results[last - 1]
             if curr.score == prev.score then
                 curr.place = prev.place
             end
