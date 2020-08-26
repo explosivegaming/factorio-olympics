@@ -136,6 +136,9 @@ local player_list_container =
 Gui.element(function(event_trigger, parent)
     -- Draw the internal container
     local container = Gui.container(parent, event_trigger, 200)
+    local label = container.add{ type = 'label', name = 'no_players', caption = 'There are currently no players' }
+    label.style.horizontally_stretchable = true
+    label.style.padding = {2, 4}
 
     -- Draw the section for each force
     for name in pairs(game.forces) do
@@ -272,6 +275,7 @@ local function redraw_player_list()
     for _, player in pairs(game.connected_players) do
         local frame = Gui.get_left_element(player, player_list_container)
         local container = frame.container
+        container.no_players.visible = #player_list_order == 0
 
         for name in pairs(game.forces) do
             local scroll_table =  container[name] or section(container, name, 2).parent

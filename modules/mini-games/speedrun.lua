@@ -11,6 +11,7 @@ local primitives = {}
 local progress   = {}
 local surfaces   = {}
 local forces     = {}
+local scores     = {}
 
 local goals = require 'config.mini_games.speedrun'
 for index, goal in ipairs(goals) do
@@ -42,12 +43,14 @@ Global.register({
     primitives = primitives,
     progress   = progress,
     surfaces   = surfaces,
-    forces     = forces
+    forces     = forces,
+    scores     = scores
 }, function(tbl)
     primitives = tbl.primitives
     progress   = tbl.progress
     surfaces   = tbl.surfaces
     forces     = tbl.forces
+    scores     = tbl.scores
 end)
 
 ----- Local Variables ----
@@ -72,6 +75,7 @@ local function reset_globals()
     reset_table(progress)
     reset_table(surfaces)
     reset_table(forces)
+    reset_table(scores)
 end
 
 ----- Map Gen -----
@@ -136,6 +140,7 @@ local function start()
             force.share_chart = true
             force.chart(surfaces[name], {{x = 80, y = 80}, {x = -80, y = -80}})
         else
+            primitives.team_count = primitives.team_count - 1
             game.merge_forces(force, game.forces.player)
             game.delete_surface(surfaces[name])
             removed[name] = true
@@ -162,21 +167,9 @@ end
 
 ----- Game Stop and Close -----
 
+local result_time_options = { hours = true, minutes = true, seconds = true, long = true, string = true }
 --- Called to stop the game and return the results to be saved
 local function stop()
-    local scores, ctn = {}, 0
-    -- Get all the data needed to write results
-    for name, team in pairs(progress) do
-        ctn = ctn + 1
-        local names = {}
-        for index, player in ipairs(forces[name].players) do names[index] = player.name end
-        scores[ctn] = { name, math.floor(team[1]/team[2]*1000)/10, names }
-    end
-
-    -- Sort by team progress
-    table.sort(scores, function(a, b)
-        return a[2] > b[2]
-    end)
 
     -- Format the results table
     local results, names = {}, {}
@@ -197,7 +190,7 @@ local function stop()
         end
     end
 
-    Mini_games.print_results(results, 'percent', names)
+    Mini_games.print_results(results, { time_seconds = result_time_options, names = names })
     return results
 end
 
@@ -259,6 +252,8 @@ local function update_progress(force, data)
     local bar_tooltip = {'', 'Last Completed: ', data[4] or 'None'}
     local label_name, label_value = 'label-'..name, math.floor(bar_value*100)..'%'
     local label_tooltip = 'Progress: '..data[1]..' / '..data[2]
+
+    -- Update the progress gui for all players
     for _, player in pairs(game.players) do
         local container = Gui.get_left_element(player, timer_container)
         local progress_table = container.progress_table
@@ -267,7 +262,19 @@ local function update_progress(force, data)
         progress_table[label_name].caption = label_value
         progress_table[label_name].tooltip = label_tooltip
     end
-    if data[1] == data[2] then Mini_games.stop_game() end
+
+    -- Check if the team has finished
+    if data[1] == data[2] then
+        local names, last = {}, #scores + 1
+        local time = math.floor((game.tick - Mini_games.get_start_time())/60)
+        for index, player in ipairs(forces[name].players) do
+            Mini_games.remove_participant(player)
+            names[index] = player.name
+        end
+        scores[last] = { name, time, names }
+        -- Check if all teams are done
+        if last == primitives.team_count then Mini_games.stop_game() end
+    end
 end
 
 --- Checks if an indicator has already been used
@@ -375,11 +382,11 @@ local function check_item_production()
 end
 
 --- Ran every tick to update the timer
-local options = { hours = true, minutes = true, seconds = true, milliseconds = true, time = true, div = 'time-format.simple-format-div-space' }
 local format_time = _C.format_time
+local timer_options = { hours = true, minutes = true, seconds = true, milliseconds = true, time = true, div = 'time-format.simple-format-div-space' }
 local function on_tick()
     local time = game.tick - Mini_games.get_start_time()
-    local format = format_time(time, options)
+    local format = format_time(time, timer_options)
     for _, player in ipairs(game.connected_players) do
         local container = Gui.get_left_element(player, timer_container)
         container.timer.caption = format

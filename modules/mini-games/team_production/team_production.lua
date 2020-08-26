@@ -615,7 +615,7 @@ local function stop()
       end
   end
 
-  Mini_games.print_results(results, 'points', names)
+  Mini_games.print_results(results, { unit = 'points', names = names })
   return results
 end
 

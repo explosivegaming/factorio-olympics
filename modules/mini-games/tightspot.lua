@@ -345,6 +345,7 @@ end
 --- When a player is removed hide the gui
 local on_player_removed = on_player_left
 
+local result_options = { unit = 'points' }
 --- Function called by mini game module to stop this game
 local function stop()
     game.speed = 1
@@ -380,7 +381,7 @@ local function stop()
 
     end
 
-    Mini_games.print_results(results, 'points')
+    Mini_games.print_results(results, result_options)
     return results
 end
 
