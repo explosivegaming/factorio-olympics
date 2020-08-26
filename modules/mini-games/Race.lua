@@ -184,7 +184,7 @@ local function on_player_added(event)
     }
 
     cars[name] = car
-    scores[name] = {}
+    scores[name] = { cars_wrecked = 0 }
     car.operable = false
     player_progress[name] = 1
 end
@@ -288,11 +288,10 @@ local function stop()
             results_by_name[name] = results[#results]
         end
 
-        if score.laps then
-            results_by_name[name].extra = {
-                laps = score.laps,
-            }
-        end
+        results_by_name[name].extra = {
+            laps = score.laps,
+            cars_wrecked = score.cars_wrecked,
+        }
     end
 
     -- Print the place that each player came
@@ -493,6 +492,8 @@ local car_destroyed = function(event)
     task.set_timeout_in_ticks(190+offset, kill_biters, name)
     task.set_timeout_in_ticks(480+offset, stop_invincibility, name)
 
+    -- Increment cars wrecked counter
+    scores[name].cars_wrecked = scores[name].cars_wrecked + 1
 end
 
 --- Triggered when a player enters or leaves a car, used to keep them in the car
