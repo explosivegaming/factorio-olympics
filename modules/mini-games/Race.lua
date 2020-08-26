@@ -5,6 +5,7 @@ local Permission_Groups = require "expcore.permission_groups"
 local Global            = require 'utils.global' --Used to prevent desyncing.
 local interface         = require 'modules.commands.interface'
 local Gui               = require 'expcore.gui._require'
+local Commands          = require 'expcore.commands'
 local config = require "config.mini_games.Race"
 
 local surface = {}
@@ -262,6 +263,7 @@ end
 --- Get the position number with the suffix appended
 local function Nth (n) return n..getSuffix(n) end
 
+local result_options = { time_seconds = {minutes = true, seconds = true, long = true, string = true} }
 --- Function called by mini game module to stop a race
 local function stop()
     local results = {}
@@ -300,7 +302,7 @@ local function stop()
     end
 
     -- Print the place that each player came
-    Mini_games.print_results(results, 'seconds')
+    Mini_games.print_results(results, result_options)
     return results
 end
 
@@ -441,11 +443,23 @@ local kill_biters = Token.register(function(name)
     end
 end)
 
+--- Unstuck yourself
+Commands.new_command('unstuck', 'Unstuck your car from walls')
+:register(function(player)
+    local car = cars[player.name]
+    if not car or not car.valid then
+        return Commands.error("Not in a car.")
+    end
+
+    local new_position = surface[1].find_non_colliding_position('assembling-machine-1', car.position, 5, 0.5)
+    car.teleport(new_position, surface[1])
+end)
+
 --- Respawn the car for a player
 local respawn_car
 respawn_car = Token.register(function(name)
     local player = dead_cars[name].player
-    local position = surface[1].find_non_colliding_position('car', dead_cars[name].position, 5, 0.5)
+    local position = surface[1].find_non_colliding_position('assembling-machine-1', dead_cars[name].position, 5, 0.5)
     if not position then
         return task.set_timeout_in_ticks(30, respawn_car, name)
     end
@@ -588,3 +602,5 @@ race:add_event(Mini_games.events.on_participant_added, on_player_added)
 race:add_event(Mini_games.events.on_participant_created, on_player_created)
 race:add_event(Mini_games.events.on_participant_left, on_player_left)
 race:add_event(Mini_games.events.on_participant_removed, on_player_removed)
+
+race:add_command('unstuck')
