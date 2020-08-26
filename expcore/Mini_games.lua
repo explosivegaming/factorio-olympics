@@ -820,7 +820,7 @@ function Mini_games.stop_game()
 
     -- Disable all commands for this mini game
     for _, command_name  in ipairs(mini_game.commands) do
-        Commands.enable(command_name)
+        Commands.disable(command_name)
     end
 
     if skip_timeout then
