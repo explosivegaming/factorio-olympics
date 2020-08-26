@@ -419,8 +419,7 @@ Commands.new_command('unstuck', 'Unstuck your car from walls')
 :register(function(player)
     local car = cars[player.name]
     if not car or not car.valid then
-        player.print("Not in a car!")
-        return Commands.error
+        return Commands.error("Not in a car.")
     end
 
     local new_position = surface[1].find_non_colliding_position('assembling-machine-1', car.position, 5, 0.5)
