@@ -417,7 +417,7 @@ end)
 local respawn_car
 respawn_car = Token.register(function(name)
     local player = dead_cars[name].player
-    local position = surface[1].find_non_colliding_position('car', dead_cars[name].position, 5, 0.5)
+    local position = surface[1].find_non_colliding_position('assembling-machine-1', dead_cars[name].position, 5, 0.5)
     if not position then
         return task.set_timeout_in_ticks(30, respawn_car, name)
     end
