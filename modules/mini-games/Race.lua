@@ -144,7 +144,7 @@ local function on_init(args)
     variables["fuel"]       = args[1]
     variables["laps"]       = tonumber(args[2])
     variables["place"]      = 1
-    scores["finish_times"]  = {}
+    variables["finish_times"] = {}
     -- Error if no lap count was given
     if not variables["laps"] then
         return Mini_games.error_in_game("No lap count given")
@@ -185,7 +185,7 @@ local function on_player_added(event)
     }
 
     cars[name] = car
-    scores[name] = {}
+    scores[name] = { cars_wrecked = 0 }
     car.operable = false
     player_progress[name] = 1
 end
@@ -215,6 +215,11 @@ local function start()
             variables["laps"] .. " Laps",
             variables["fuel"],
         }, " | "),
+        extra = {
+            name = variables["config"].name,
+            laps = variables["laps"],
+            fuel = variables["fuel"],
+        }
     }
 end
 
@@ -232,7 +237,6 @@ local function on_player_removed(event)
 
     -- Clear any stored data
     local name = player.name
-    scores[name] = nil
     player_progress[name] = nil
     if player.character then
         player.character.destructible = true
@@ -262,25 +266,44 @@ local function Nth (n) return n..getSuffix(n) end
 local result_options = { time_seconds = {minutes = true, seconds = true, long = true, string = true} }
 --- Function called by mini game module to stop a race
 local function stop()
-    -- Print the place that each player came
     local results = {}
-    for name, value in pairs(scores["finish_times"]) do
-        local time = value[2]
+    local results_by_name = {}
 
-        local up_result = results[#results]
-        if up_result and up_result.score == math.round(time, 2) then
-            up_result.players[#up_result.players + 1] = name
+    -- Add scores for players that finished the game
+    local last = 0
+    for name, result in pairs(variables["finish_times"]) do
+        local curr = {
+            place = result.place,
+            score = math.round(result.time, 2),
+            players = {name}
+        }
+        last = last + 1
+        results[last] = curr
+        results_by_name[name] = curr
 
-        else
-            results[#results + 1] = {
-                place = value[1],
-                score = math.round(time, 2),
-                players = {name}
-            }
+        -- Correct placement in case of score ties
+        if last > 1 then
+            local prev = results[last - 1]
+            if curr.score == prev.score then
+                curr.place = prev.place
+            end
         end
-
     end
 
+    -- Add additional score data for all participants
+    for name, score in pairs(scores) do
+        if not results_by_name[name] then
+            results[#results + 1] = { players = {name} }
+            results_by_name[name] = results[#results]
+        end
+
+        results_by_name[name].extra = {
+            laps = score.laps,
+            cars_wrecked = score.cars_wrecked,
+        }
+    end
+
+    -- Print the place that each player came
     Mini_games.print_results(results, result_options)
     return results
 end
@@ -362,6 +385,13 @@ local function player_move(event)
             game.print(lap_format:format(name, lap_time, laps[name], variables["laps"]))
             scores[name].time = game.tick
 
+            -- Store lap time
+            if scores[name].laps then
+                scores[name].laps[laps[name]] = math.round(lap_time, 2)
+            else
+                scores[name].laps = { math.round(lap_time, 2) }
+            end
+
             -- Add the lap to the total
             if scores[name].total_time then
                 scores[name].total_time = math.round(scores[name].total_time + lap_time, 4)
@@ -378,7 +408,7 @@ local function player_move(event)
 
                 -- Print and update finish times
                 game.print(finish_format:format(name, scores[name].total_time, Nth(variables["place"])))
-                scores["finish_times"][name] = { variables["place"], scores[name].total_time }
+                variables["finish_times"][name] = { place = variables["place"], time = scores[name].total_time }
                 variables["place"] = variables["place"] + 1
 
                 -- If all players have finished then end the game
@@ -483,6 +513,8 @@ local car_destroyed = function(event)
     task.set_timeout_in_ticks(190+offset, kill_biters, name)
     task.set_timeout_in_ticks(480+offset, stop_invincibility, name)
 
+    -- Increment cars wrecked counter
+    scores[name].cars_wrecked = scores[name].cars_wrecked + 1
 end
 
 --- Triggered when a player enters or leaves a car, used to keep them in the car
