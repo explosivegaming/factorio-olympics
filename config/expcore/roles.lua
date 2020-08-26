@@ -108,6 +108,7 @@ local default = Roles.new_role('Guest','')
     'command/warp',
     'command/join-UFE',
     'command/join-UFW',
+    'command/unstuck',
     'command/lobby',
 }
 
