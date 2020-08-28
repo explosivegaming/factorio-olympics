@@ -247,6 +247,11 @@ local function on_player_removed(event)
         cars[player.name].destroy()
         cars[player.name] = nil
     end
+
+    -- If no participants are left end the game
+    if Mini_games.get_current_state() == 'Started' and variables["place"] > #Mini_games.get_participants() then
+        Mini_games.stop_game()
+    end
 end
 
 --- Get the english suffix that follows a position number
