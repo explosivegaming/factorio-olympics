@@ -160,6 +160,14 @@ local function on_init(args)
     setup_areas()
 end
 
+--- Move spectator to the start line when joining in
+local function on_spectator_spawned(event)
+    local player = game.players[event.player_index]
+    if surface[1] then
+        player.teleport(variables["config"].start_pos.left, surface[1])
+    end
+end
+
 --- When a player is added create a car for them
 local function on_player_added(event)
     local player = game.players[event.player_index]
@@ -605,6 +613,7 @@ race:add_event(defines.events.on_player_changed_position, player_move)
 race:add_event(defines.events.on_entity_died, car_destroyed)
 race:add_event(defines.events.on_player_driving_changed_state, back_in_car)
 
+race:add_event(Mini_games.events.on_spectator_spawned, on_spectator_spawned)
 race:add_event(Mini_games.events.on_participant_added, on_player_added)
 race:add_event(Mini_games.events.on_participant_created, on_player_created)
 race:add_event(Mini_games.events.on_participant_left, on_player_left)

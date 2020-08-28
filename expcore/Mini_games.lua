@@ -21,6 +21,7 @@ local Mini_games = {
     mini_games = {},
     available  = {},
     events = {
+        on_spectator_spawned = script.generate_event_name(),
         on_participant_added = script.generate_event_name(),
         on_participant_created = script.generate_event_name(),
         on_participant_joined = script.generate_event_name(),
@@ -243,6 +244,7 @@ end
 --- Respawn a spectator, if a game is running then they are placed in a spectator controller
 -- If there is a game closing then they will be placed in a character in the lobby
 -- If there if the server is closed nothing will happen as they have already been moved to the lobby
+-- If they were spawned as spectator then on_spectator_spawned is raised.
 function Mini_games.respawn_spectator(player)
     Gui.update_top_flow(player)
     if player.character then player.character.destroy() end
@@ -256,6 +258,7 @@ function Mini_games.respawn_spectator(player)
     elseif primitives.current_game then
         dlog('Respawn in spectator:', player.name)
         player.set_controller{ type = defines.controllers.spectator }
+        raise_event('on_spectator_spawned', player)
     end
 end
 
@@ -533,13 +536,11 @@ local start_game = Token.register(function(timeout_nonce)
     set_internal_state('Starting')
     WaitingGui.remove_gui()
 
-    -- Puts all players into spectator mode, teleports them to the surface, and call cleanup on participant selector
-    local surfaces, selector, surface = mini_game.surface_names, mini_game.participant_selector, nil
-    if #surfaces == 1 then surface = surfaces[1] end
+    -- Puts all players into spectator mode and call cleanup on participant selector
+    local surfaces, selector = mini_game.surface_names, mini_game.participant_selector
     for _, player in ipairs(game.connected_players) do
         Gui.toggle_top_flow(player, false)
         Mini_games.respawn_spectator(player)
-        if surface then player.teleport({0,0}, surface) end
         if selector then
             dlog('Remove selector:', player.name)
             xpcall(selector, internal_error, player, true)
