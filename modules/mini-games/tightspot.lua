@@ -295,6 +295,15 @@ local function on_player_added(event)
 
 end
 
+--- Move spectator to the start line when joining in
+local function on_spectator_spawned(event)
+    local player = game.players[event.player_index]
+    local surface = variables.level.surface
+    if surface then
+        player.teleport({0,0}, surface)
+    end
+end
+
 --- When a player joins the game teleport them to they island and update they gui
 local function on_player_joined(event)
     local level  = variables.level
@@ -770,6 +779,7 @@ tight:add_event(defines.events.on_market_item_purchased, on_market_used)
 tight:add_event(defines.events.on_player_mined_entity, on_entity_mined)
 tight:add_event(defines.events.on_player_changed_position, on_player_moved)
 
+tight:add_event(Mini_games.events.on_spectator_spawned, on_spectator_spawned)
 tight:add_event(Mini_games.events.on_participant_added, on_player_added)
 tight:add_event(Mini_games.events.on_participant_joined, on_player_joined)
 tight:add_event(Mini_games.events.on_participant_left, on_player_left)

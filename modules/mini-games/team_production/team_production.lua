@@ -794,6 +794,15 @@ local function on_player_added(event)
   player.chat_color = lighten(team.color)
 end
 
+--- Move spectator to the start line when joining in
+local function on_spectator_spawned(event)
+  local player = game.players[event.player_index]
+  local surface = script_data.surface
+  if surface then
+      player.teleport({0,0}, surface)
+  end
+end
+
 --- Triggered when a participant joins the game
 local function on_player_created(event)
   local player = game.players[event.player_index]
@@ -920,6 +929,7 @@ team_production:set_participant_selector(TeamSelector.selector(function() return
 team_production:set_gui(main_gui, gui_callback)
 team_production:add_option(1) -- how many options are needed with /start
 
+team_production:add_event(Mini_games.events.on_spectator_spawned, on_spectator_spawned)
 team_production:add_event(Mini_games.events.on_participant_added, on_player_added)
 team_production:add_event(Mini_games.events.on_participant_created, on_player_created)
 team_production:add_event(Mini_games.events.on_participant_removed, on_player_removed)
