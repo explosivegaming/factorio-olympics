@@ -120,11 +120,14 @@ local function init(args)
     if not map_seed or map_seed < 0 or map_seed > 4294967295 then Mini_games.error_in_game('Map seed is invalid') end
 
     -- Create a surface for each team with the same seed and settings
-    local remaining, indicators = { seed = map_seed }, goals[target]
+    local remaining, indicators, force_player = { seed = map_seed }, goals[target], game.forces.player
     for i = 1, team_count do
         local name = 'Team '..i
+        local force = game.create_force(name)
+        force.set_friend(force_player, true)
+        force.share_chart = true
+        forces[name] = force
         remaining[i] = name
-        forces[name] = game.create_force(name)
         progress[name] = { 0, indicators.total, table.deep_copy(indicators) }
     end
 
