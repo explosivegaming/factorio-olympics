@@ -73,17 +73,24 @@ local function on_init(args)
     local force_USA = game.create_force(args[2] or 'United Factory Workers')
     local force_USSR = game.create_force(args[3] or 'Union of Factory Employees')
 
-    local surface = MS.generate_surface('Space_Race')
-    surface.min_brightness = 0;
+    local force_player = game.forces.player
+    force_USA.set_friend(force_player, true)
+    force_USSR.set_friend(force_player, true)
 
-    force_USSR.set_spawn_position({x = 409, y = 0}, surface)
-    force_USA.set_spawn_position({x = -409, y = 0}, surface)
+    force_USA.share_chart = true
+    force_USSR.share_chart = true
 
     force_USSR.laboratory_speed_modifier = 1
     force_USA.laboratory_speed_modifier = 1
 
     force_USSR.research_queue_enabled = true
     force_USA.research_queue_enabled = true
+
+    local surface = MS.generate_surface('Space_Race')
+    surface.min_brightness = 0
+
+    force_USSR.set_spawn_position({x = 409, y = 0}, surface)
+    force_USA.set_spawn_position({x = -409, y = 0}, surface)
 
     surface.request_to_generate_chunks({400, 0}, 3)
     surface.request_to_generate_chunks({-400, 0}, 3)
