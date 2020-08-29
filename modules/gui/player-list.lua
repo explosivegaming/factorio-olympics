@@ -78,7 +78,6 @@ end)
         if player.character then
             player.zoom_to_world(selected_player.position, 1.75)
         else
-            --player.teleport(selected_player.position, selected_player.surface)
             follow_label(player.gui.screen, selected_player)
         end
     end
