@@ -18,6 +18,7 @@ local format_time = _C.format_time --- @dep expcore.common
 local follow_label =
 Gui.element(function(event_trigger, parent, following)
     local label = parent.add{
+        name = event_trigger,
         type = 'label',
         style = 'heading_1_label',
         caption = 'Following '..following.name..'.\nPress esc or this text to stop.'
@@ -32,7 +33,7 @@ Gui.element(function(event_trigger, parent, following)
     Follow.start(player, following)
     return label
 end)
-:on_close(function(player, element)
+:on_closed(function(player, element)
     Follow.stop(player)
     Gui.destroy_if_valid(element)
 end)
