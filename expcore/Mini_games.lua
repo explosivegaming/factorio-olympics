@@ -537,7 +537,7 @@ local start_game = Token.register(function(timeout_nonce)
     WaitingGui.remove_gui()
 
     -- Puts all players into spectator mode and call cleanup on participant selector
-    local surfaces, selector = mini_game.surface_names, mini_game.participant_selector
+    local selector = mini_game.participant_selector
     for _, player in ipairs(game.connected_players) do
         Gui.toggle_top_flow(player, false)
         Mini_games.respawn_spectator(player)
