@@ -1,6 +1,6 @@
 
-local Event = require 'utils.event'
-local Global = require 'utils.global'
+local Event = require 'utils.event' --- @dep utils.event
+local Global = require 'utils.global' --- @dep utils.global
 
 ----- Locals -----
 local following = {}
@@ -22,6 +22,7 @@ function Public.start(player, entity)
     -- Due to current use case we do not need to handle player characters, however using associate_character it would be possible
     assert(not player.character, 'Player can not have a character while following another')
 
+    player.teleport(entity.position, entity.surface)
     following[player.index] = {player, entity}
 end
 
@@ -33,18 +34,25 @@ function Public.stop(player)
     following[player.index] = nil
 end
 
+--- Used to stop all players following an entity or player
+function Public.stop_all()
+    for key in pairs(following) do
+        following[key] = nil
+    end
+end
+
 ----- Events -----
 
 --- Updates the location of the player as well as doing some sanity checks
 -- @tparam LuaPlayer player The player to update the position of
 -- @tparam ?LuaPlayer|LuaEntity entity The player or entity being followed
 local function update_player_location(player, entity)
-    if not player.connected then
+    if not player.connected or player.character then
         following[player.index] = nil
     elseif not entity.valid then
         following[player.index] = nil
     else
-        player.position = entity.position
+        player.teleport(entity.position)
     end
 end
 

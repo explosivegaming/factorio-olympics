@@ -10,7 +10,36 @@ local Roles = require 'expcore.roles' --- @dep expcore.roles
 local Mini_games = require 'expcore.Mini_games' --- @dep expcore.Mini_games
 local Event = require 'utils.event' --- @dep utils.event
 local Colors = require 'utils.color_presets' --- @dep utils.color_presets
+local Follow = require 'modules.control.follow'--- @dep modules.control.follow
 local format_time = _C.format_time --- @dep expcore.common
+
+--- Label used to show that the player is following, also used to allow esc to stop following
+-- @element follow_label
+local follow_label =
+Gui.element(function(event_trigger, parent, following)
+    local label = parent.add{
+        type = 'label',
+        style = 'heading_1_label',
+        caption = 'Following '..following.name..'.\nPress esc or this text to stop.'
+    }
+
+    local player = Gui.get_player_from_element(parent)
+    local res = player.display_resolution
+    local uis = player.display_scale
+    label.location = {res.width/2, res.width.height-(20*uis)}
+    player.opened = label
+
+    Follow.start(player, following)
+    return label
+end)
+:on_close(function(player, element)
+    Follow.stop(player)
+    Gui.destroy_if_valid(element)
+end)
+:on_click(function(player, element)
+    Follow.stop(player)
+    Gui.destroy_if_valid(element)
+end)
 
 --- Set of elements that are used to make up a row of the player table
 -- @element add_player_base
@@ -47,7 +76,8 @@ end)
         if player.character then
             player.zoom_to_world(selected_player.position, 1.75)
         else
-            player.teleport(selected_player.position, selected_player.surface)
+            --player.teleport(selected_player.position, selected_player.surface)
+            follow_label(player.gui.screen, selected_player)
         end
     end
 end)
