@@ -21,13 +21,14 @@ Gui.element(function(event_trigger, parent, following)
         name = event_trigger,
         type = 'label',
         style = 'heading_1_label',
-        caption = 'Following '..following.name..'.\nPress esc or this text to stop.'
+        caption = 'Following '..following.name..'.\nPress ESC or this text to stop.'
     }
 
     local player = Gui.get_player_from_element(parent)
     local res = player.display_resolution
-    local uis = player.display_scale
-    label.location = {res.width/2, res.width.height-(20*uis)}
+    label.location = {0, res.height-150}
+    label.style.width = res.width
+    label.style.horizontal_align = 'center'
     player.opened = label
 
     Follow.start(player, following)
