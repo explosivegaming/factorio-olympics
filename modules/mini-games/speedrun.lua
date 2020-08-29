@@ -218,6 +218,15 @@ end
 
 ----- Player Events -----
 
+--- Move spectator to the start line when joining in
+local function on_spectator_spawned(event)
+    local player = game.players[event.player_index]
+    local _, surface = next(surfaces)
+    if surface then
+        player.teleport({0,0}, surface)
+    end
+end
+
 --- Trigger when a participant is removed from the game
 -- Removes the player from the team arrays
 local function on_player_removed(event)
@@ -572,6 +581,7 @@ Speedrun:set_participant_selector(TeamSelector.selector(function() return forces
 Speedrun:set_gui(main_gui, gui_callback)
 Speedrun:add_option(3) -- how many options are needed with /start
 
+Speedrun:add_event(Mini_games.events.on_spectator_spawned, on_spectator_spawned)
 Speedrun:add_event(Mini_games.events.on_participant_created, on_player_created)
 Speedrun:add_event(Mini_games.events.on_participant_removed, on_player_removed)
 

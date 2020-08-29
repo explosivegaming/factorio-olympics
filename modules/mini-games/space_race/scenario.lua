@@ -181,6 +181,15 @@ local function on_init(args)
     end
 end
 
+--- Move spectator to the start line when joining in
+local function on_spectator_spawned(event)
+    local player = game.players[event.player_index]
+    local surface = MS.get_surface()
+    if surface then
+        player.teleport({0,0}, surface)
+    end
+end
+
 --- When a player joins teleport them to there base, if start of game then give them a character
 local get_teleport_location
 local function on_player_created(event)
@@ -526,6 +535,7 @@ space_race:set_participant_selector(TeamSelector.selector(Public.get_teams), tru
 space_race:set_gui(main_gui, gui_callback)
 space_race:add_option(3)
 
+space_race:add_event(Mini_games.events.on_spectator_spawned, on_spectator_spawned)
 space_race:add_event(Mini_games.events.on_participant_created, on_player_created)
 space_race:add_event(Mini_games.events.on_participant_removed, on_player_removed)
 
