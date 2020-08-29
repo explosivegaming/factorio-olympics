@@ -12,12 +12,14 @@ local surface = {}
 local gates = {}
 local areas = {}
 local player_progress = {}
-local cars = {}
+local player_cars = {}
+local start_cars = {}
 local dead_cars = {}
 local variables = {}
 local scores = {}
 local laps = {}
 local gate_boxes = {}
+
 --- Register a new permission group for players not in cars
 Permission_Groups.new_group('out_car')
 :disallow_all()
@@ -36,7 +38,8 @@ Global.register({
     variables       = variables,
     areas           = areas,
     player_progress = player_progress,
-    cars            = cars,
+    player_cars     = player_cars,
+    start_cars      = start_cars,
     dead_cars       = dead_cars,
     scores          = scores,
     laps            = laps,
@@ -47,7 +50,8 @@ Global.register({
     variables       = tbl.variables
     areas           = tbl.areas
     player_progress = tbl.player_progress
-    cars            = tbl.cars
+    player_cars     = tbl.player_cars
+    start_cars      = tbl.start_cars
     dead_cars       = tbl.dead_cars
     scores          = tbl.scores
     laps            = tbl.laps
@@ -71,7 +75,8 @@ local function reset_globals()
     reset_table(surface)
     reset_table(variables)
     reset_table(player_progress)
-    reset_table(cars)
+    reset_table(player_cars)
+    reset_table(start_cars)
     reset_table(dead_cars)
     reset_table(scores)
     reset_table(laps)
@@ -92,7 +97,7 @@ race_count_down = Token.register(function()
     else
         game.print("0 --> GO!", { 0, 1, 0 })
         for _, player in ipairs(Mini_games.get_participants()) do
-            local car = cars[player.name]
+            local car = player_cars[player.name]
             if not car or not car.valid then return Mini_games.remove_participant(player) end
             car.get_fuel_inventory().insert{name = variables["fuel"], count = 100}
             scores[player.name].time = game.tick
@@ -140,7 +145,7 @@ local function on_init(args)
     variables["done_left"]  = 0
     variables["count_down"] = 4
     variables["done_right"] = 0
-    variables["left"]       = true
+    variables["next_on_left"]       = true
     variables["fuel"]       = args[1]
     variables["laps"]       = tonumber(args[2])
     variables["place"]      = 1
@@ -174,15 +179,15 @@ local function on_player_added(event)
     local name = player.name
 
     local pos
-    local postions = table.deep_copy(variables["config"].start_pos)
-    if variables["left"] then
-        pos = {postions.left.x, postions.left.y + variables["done_left"] * 5}
+    local positions = variables["config"].start_pos
+    if variables["next_on_left"] then
+        pos = {positions.left.x, positions.left.y + variables["done_left"] * 5}
         variables["done_left"] = variables["done_left"] + 1
-        variables["left"] = false
+        variables["next_on_left"] = false
     else
-        pos = {postions.right.x, postions.right.y + variables["done_right"] * 5}
+        pos = {positions.right.x, positions.right.y + variables["done_right"] * 5}
         variables["done_right"] = variables["done_right"] + 1
-        variables["left"] = true
+        variables["next_on_left"] = true
     end
 
     local car = surface[1].create_entity{
@@ -192,18 +197,27 @@ local function on_player_added(event)
         direction = defines.direction.north
     }
 
-    cars[name] = car
-    scores[name] = { cars_wrecked = 0 }
     car.operable = false
     player_progress[name] = 1
+    start_cars[#start_cars+1] = car
+    scores[name] = { cars_wrecked = 0 }
 end
 
 --- When a player joins place them into their car
 local function on_player_created(event)
     local player = game.players[event.player_index]
-    local car = cars[player.name]
+
+    local last = #start_cars
+    local index = math.random(1, last)
+    local car = start_cars[index]
+    start_cars[index] = start_cars[last]
+    start_cars[last] = nil
+    player_cars[player.name] = car
+    game.print(player.name..' '..inspect(car.position))
+
     local pos = car.surface.find_non_colliding_position('character', car.position, 6, 1)
     player.teleport(pos, car.surface)
+
     local character = car.surface.create_entity{name='character', position=pos, force='player'}
     player.set_controller{type = defines.controllers.character, character = character}
     car.set_driver(player)
@@ -251,9 +265,25 @@ local function on_player_removed(event)
     end
 
     -- Destroy their car
-    if cars[player.name] then
-        cars[player.name].destroy()
-        cars[player.name] = nil
+    if player_cars[player.name] then
+        player_cars[player.name].destroy()
+        player_cars[player.name] = nil
+    end
+
+    -- If the game has not started yet then remove a start car
+    local last = #start_cars
+    if Mini_games.get_current_state() ~= 'Started' and last > 0 then
+        start_cars[last].destroy()
+        start_cars[last] = nil
+        if variables.next_on_left then
+            -- If the next car is on the left then the last car was on the right
+            variables.done_right = variables.done_right - 1
+            variables.next_on_left = false
+        else
+            -- If the next car is on the right then the last car was on the left
+            variables.done_left = variables.done_left + 1
+            variables.next_on_left = true
+        end
     end
 
     -- If no participants are left end the game
@@ -343,7 +373,7 @@ local lap_format = '%s has completed a lap in %.4f seconds. Lap %d out of %d.'
 local finish_format = '%s has completed all laps in %.4f seconds placing them %s.'
 local function player_move(event)
     local player = game.players[event.player_index]
-    if not cars[player.name] then return end
+    if not player_cars[player.name] then return end
 
     -- Increase progress by one and open gates
     local name = player.name
@@ -366,7 +396,7 @@ local function player_move(event)
     -- If the players progress wasnt increased, check if the player cheated
     if insideBox(gate_boxes[4], pos) then
         if progress < 5 then
-            local car = cars[name]
+            local car = player_cars[name]
             local valid_car_pos = surface[1].find_non_colliding_position_in_box('car', areas[1], 0.5)
             if car and car.valid then
                 car.teleport(valid_car_pos)
@@ -414,8 +444,8 @@ local function player_move(event)
 
             -- Check if a player has completed all laps
             if laps[name] >= variables["laps"] then
-                cars[name].destroy()
-                cars[name] = nil
+                player_cars[name].destroy()
+                player_cars[name] = nil
                 if player.character then player.character.destroy() end
                 player.set_controller{ type = defines.controllers.god }
 
@@ -461,7 +491,7 @@ end)
 --- Unstuck yourself
 Commands.new_command('unstuck', 'Unstuck your car from walls')
 :register(function(player)
-    local car = cars[player.name]
+    local car = player_cars[player.name]
     if not car or not car.valid then
         return Commands.error("Not in a car.")
     end
@@ -490,7 +520,7 @@ respawn_car = Token.register(function(name)
     car.set_driver(player)
     car.orientation = dead_cars[name].orientation
     car.get_fuel_inventory().insert{ name = variables["fuel"], count = 100 }
-    cars[name] = car
+    player_cars[name] = car
 
     Permission_Groups.set_player_group(player, dead_cars[name].group)
     start_invincibility(car, name)
@@ -534,7 +564,7 @@ end
 local function back_in_car(event)
     local player = game.players[event.player_index]
     if not player.vehicle then
-        local car = cars[player.name]
+        local car = player_cars[player.name]
         if car then
             car.set_driver(player)
         end
