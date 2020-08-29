@@ -16,7 +16,7 @@ local uranium_none = {
     }
 }
 
-MS.new('Space_Race'):set_map_gen_settings{Map_gen_presets.oil_none, uranium_none, Map_gen_presets.ore_none, Map_gen_presets.water_none}
+MS.new('Space_Race'):set_map_gen_settings{Map_gen_presets.default, Map_gen_presets.oil_none, uranium_none, Map_gen_presets.ore_none, Map_gen_presets.water_none}
 
 local sand_width = 128
 local sand_width_inv = math.tau / sand_width
