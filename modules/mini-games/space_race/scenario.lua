@@ -283,6 +283,11 @@ local function start()
     cliff.generate_cliffs(surface)
     surface.set_tiles(tiles)
     generate_structures()
+
+    return {
+        variant = math.ceil(primitives.startup_timer / 3600) .. " Minute Start",
+        extra = { startup_timer = primitives.startup_timer / 60 },
+    }
 end
 
 ----- Pre Game Start -----
@@ -310,14 +315,27 @@ end
 
 --- Used to stop a game
 local function stop()
-    local won, player_names = primitives.won, {}
-    for index, player in ipairs(game.connected_players) do
-        if player.force.name == won then
-            player_names[index] = player.name
+    local won = primitives.won
+    local lost
+    if won == primitives.force_USA then
+        lost = primitives.force_USSR
+    else
+        lost = primitives.force_USA
+    end
+
+    local players_won, players_lost = {}, {}
+    for _, player in ipairs(game.connected_players) do
+        if player.force == won then
+            players_won[#players_won + 1] = player.name
+        elseif player.force == lost then
+            players_lost[#players_lost + 1] = player.name
         end
     end
 
-    return {{ place = 1, score = 1, players = player_names }}
+    return {
+        { place = 1, score = 1, players = players_won, extra = { team = won.name }},
+        { place = 2, score = 0, players = players_lost, extra = { team = lost.name }},
+    }
 end
 
 --- Used to stop a game and reset all variables, called by mini game manager
