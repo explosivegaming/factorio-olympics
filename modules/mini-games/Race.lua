@@ -213,7 +213,6 @@ local function on_player_created(event)
     start_cars[index] = start_cars[last]
     start_cars[last] = nil
     player_cars[player.name] = car
-    game.print(player.name..' '..inspect(car.position))
 
     local pos = car.surface.find_non_colliding_position('character', car.position, 6, 1)
     player.teleport(pos, car.surface)
