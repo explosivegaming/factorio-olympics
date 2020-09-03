@@ -48,7 +48,7 @@ end)
         if player.character then
             player.zoom_to_world(selected_player.position, 1.75)
         else
-            Follow.start(player.gui.screen, selected_player)
+            Follow.start(player, selected_player)
         end
     end
 end)
