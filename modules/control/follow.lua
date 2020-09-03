@@ -22,6 +22,7 @@ function Public.start(player, entity)
     -- Due to current use case we do not need to handle player characters, however using associate_character it would be possible
     assert(not player.character, 'Player can not have a character while following another')
 
+    player.close_map()
     player.teleport(entity.position, entity.surface)
     following[player.index] = {player, entity}
 end
