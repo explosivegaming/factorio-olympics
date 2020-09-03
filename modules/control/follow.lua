@@ -79,11 +79,9 @@ end)
 -- @tparam LuaPlayer player The player to update the position of
 -- @tparam ?LuaPlayer|LuaEntity entity The player or entity being followed
 local function update_player_location(player, entity, old_position)
-    if not player.connected or player.character then
+    if player.character or not entity.valid then
         Public.stop(player)
     elseif player.position.x ~= old_position.x or player.position.y ~= old_position.y then
-        Public.stop(player)
-    elseif not entity.valid then
         Public.stop(player)
     else
         player.teleport(entity.position)
@@ -100,6 +98,17 @@ end
 
 -- Update the location of all players each tick
 Event.add(defines.events.on_tick, update_all)
+
+-- Check for player leaving
+Event.add(defines.events.on_player_left_game, function(event)
+    local player = game.players[event.player_index]
+    Public.stop(player)
+    for _, data in pairs(following) do
+        if data[2] == player then
+            Public.stop(data[1])
+        end
+    end
+end)
 
 ----- Module Return -----
 return Public
