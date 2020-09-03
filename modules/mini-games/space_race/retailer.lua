@@ -594,6 +594,29 @@ function Retailer.add_market(group_name, market_entity)
     set_market_group_name(market_entity.position, group_name)
 end
 
+--- Removes a market group
+---@param group_name string
+function Retailer.remove_market_group(group_name)
+    -- Clear the globals
+    memory.items[group_name] = nil
+    memory.group_label[group_name] = nil
+    memory.limited_items[group_name] = nil
+    memory.market_gui_refresh_scheduled[group_name] = nil
+    -- Clear any connected markets
+    for key, value in pairs(memory.markets) do
+        if value == group_name then
+            memory.markets[key] = nil
+        end
+    end
+    -- Close any open guis
+    for index, data in pairs(memory.players_in_market_view) do
+        if data.group_name == group_name then
+            local player = game.players[index]
+            close_market_gui(player)
+        end
+    end
+end
+
 ---Returns the group name of the market, nil if not registered.
 ---@param market_entity LuaEntity
 function Retailer.get_market_group_name(market_entity)

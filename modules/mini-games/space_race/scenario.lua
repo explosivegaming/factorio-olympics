@@ -348,6 +348,9 @@ local function on_close()
     primitives.force_USSR = nil
     primitives.won = nil
 
+    Retailer.remove_market_group('USA_market')
+    Retailer.remove_market_group('USSR_market')
+    market_events.reset()
     uranium_gen_reset()
 end
 
