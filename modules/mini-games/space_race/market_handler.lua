@@ -192,6 +192,9 @@ local function unlock_market_item(force, item_name)
     end
     if group_name then
         Retailer.enable_item(group_name, item_name)
+        local items = Retailer.get_items(group_name)
+        local item = items[item_name]
+        force.print{'', item.name_label, ' is now available in the market!'}
         if not (item_name == 'tank') then
             Debug.print('Unlocked: ' .. item_name .. ' | For: ' .. group_name)
         end
