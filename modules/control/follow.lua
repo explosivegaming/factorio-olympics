@@ -1,6 +1,7 @@
 
 local Event = require 'utils.event' --- @dep utils.event
 local Global = require 'utils.global' --- @dep utils.global
+local Gui = require 'expcore.gui' --- @dep expcore.gui
 
 ----- Locals -----
 local following = {}
@@ -10,6 +11,33 @@ local Public = {}
 Global.register(following, function(tbl)
     following = tbl
 end)
+
+----- Gui -----
+
+--- Label used to show that the player is following, also used to allow esc to stop following
+-- @element follow_label
+local follow_label =
+Gui.element(function(event_trigger, parent, target)
+    Gui.destroy_if_valid(parent[event_trigger])
+
+    local label = parent.add{
+        name = event_trigger,
+        type = 'label',
+        style = 'heading_1_label',
+        caption = 'Following '..target.name..'.\nPress ESC or this text to stop.'
+    }
+
+    local player = Gui.get_player_from_element(parent)
+    local res = player.display_resolution
+    label.location = {0, res.height-150}
+    label.style.width = res.width
+    label.style.horizontal_align = 'center'
+    player.opened = label
+
+    return label
+end)
+:on_closed(Public.stop)
+:on_click(Public.stop)
 
 ----- Public Functions -----
 
@@ -23,6 +51,7 @@ function Public.start(player, entity)
     assert(not player.character, 'Player can not have a character while following another')
 
     player.close_map()
+    follow_label(player.gui.screen, entity)
     player.teleport(entity.position, entity.surface)
     following[player.index] = {player, entity}
 end
@@ -32,6 +61,7 @@ end
 function Public.stop(player)
     assert(player and player.valid, 'Invalid player given to follower')
 
+    Gui.destroy_if_valid(player.gui.screen[follow_label.name])
     following[player.index] = nil
 end
 
@@ -49,9 +79,9 @@ end
 -- @tparam ?LuaPlayer|LuaEntity entity The player or entity being followed
 local function update_player_location(player, entity)
     if not player.connected or player.character then
-        following[player.index] = nil
+        Public.stop(player)
     elseif not entity.valid then
-        following[player.index] = nil
+        Public.stop(player)
     else
         player.teleport(entity.position)
     end
