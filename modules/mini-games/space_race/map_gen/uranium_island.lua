@@ -149,7 +149,7 @@ if Game_mode_config.king_of_the_hill then
     end
 
     Events.on_nth_tick = function()
-        if Mini_games.get_current_state() ~= 'Started' then
+        if Mini_games.get_current_state() == 'Started' then
             for index, crafter in pairs(crafters) do
                 local item = crafter.get_recipe().products[1].name
                 crafter.get_output_inventory().insert({name = item, count = 1})

@@ -29,6 +29,12 @@ Global.register(
     end
 )
 
+local function reset()
+    unlock_progress.force_USA  = { players_killed = 0, entities_killed = 0 }
+    unlock_progress.force_USSR = { players_killed = 0, entities_killed = 0 }
+    for key in pairs(saved_prices) do saved_prices[key] = nil end
+end
+
 local config = require 'config.mini_games.space_race'
 
 local entity_kill_rewards = config.entity_kill_rewards
@@ -186,6 +192,9 @@ local function unlock_market_item(force, item_name)
     end
     if group_name then
         Retailer.enable_item(group_name, item_name)
+        local items = Retailer.get_items(group_name)
+        local item = items[item_name]
+        force.print{'', item.name_label, ' is now available in the market!'}
         if not (item_name == 'tank') then
             Debug.print('Unlocked: ' .. item_name .. ' | For: ' .. group_name)
         end
@@ -525,5 +534,6 @@ return {
     on_market_purchase = on_market_purchase,
     on_entity_died = on_entity_died,
     on_player_died = on_player_died,
-    on_research_finished = on_research_finished
+    on_research_finished = on_research_finished,
+    reset = reset
 }
