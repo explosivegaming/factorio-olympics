@@ -13,36 +13,6 @@ local Colors = require 'utils.color_presets' --- @dep utils.color_presets
 local Follow = require 'modules.control.follow'--- @dep modules.control.follow
 local format_time = _C.format_time --- @dep expcore.common
 
---- Label used to show that the player is following, also used to allow esc to stop following
--- @element follow_label
-local follow_label =
-Gui.element(function(event_trigger, parent, following)
-    local label = parent.add{
-        name = event_trigger,
-        type = 'label',
-        style = 'heading_1_label',
-        caption = 'Following '..following.name..'.\nPress ESC or this text to stop.'
-    }
-
-    local player = Gui.get_player_from_element(parent)
-    local res = player.display_resolution
-    label.location = {0, res.height-150}
-    label.style.width = res.width
-    label.style.horizontal_align = 'center'
-    player.opened = label
-
-    Follow.start(player, following)
-    return label
-end)
-:on_closed(function(player, element)
-    Follow.stop(player)
-    Gui.destroy_if_valid(element)
-end)
-:on_click(function(player, element)
-    Follow.stop(player)
-    Gui.destroy_if_valid(element)
-end)
-
 --- Set of elements that are used to make up a row of the player table
 -- @element add_player_base
 local add_player_base =
@@ -78,7 +48,7 @@ end)
         if player.character then
             player.zoom_to_world(selected_player.position, 1.75)
         else
-            follow_label(player.gui.screen, selected_player)
+            Follow.start(player, selected_player)
         end
     end
 end)
