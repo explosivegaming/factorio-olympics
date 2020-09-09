@@ -489,10 +489,6 @@ local function production_finished(force)
     end
   end
 
-  if #script_data.winners == 1 then
-    script_data.end_round_tick = game.tick + config.time_before_round_end
-  end
-
   script_data.points[force.name] = points
   for k, player in pairs(game.players) do
     if player.force ~= force then
@@ -503,6 +499,14 @@ local function production_finished(force)
       player.play_sound({path = "utility/game_won"})
     end
   end
+
+  local winner_count = #script_data.winners
+  if winner_count == script_data.number_of_teams then
+    Mini_games.stop_game()
+  elseif winner_count == 1 then
+    script_data.end_round_tick = game.tick + config.time_before_round_end
+  end
+
 end
 
 --- Assigns points to a team based on the item that was made
