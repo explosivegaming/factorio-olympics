@@ -85,12 +85,11 @@ end
 --- Welcome screen spectate button
 local SpectateButton =
 Gui.element{
-    name = event_trigger,
     type = 'button',
     caption = "Spectate Game",
     style = 'button',
 }
-:on_click(function(player, element, event)
+:on_click(function(player, _)
     -- Remove welcome screen and remove player from participants
     player_data[player.index].show_welcome_screen = false
     Roles.unassign_player(player, {'Participant'}, nil, true, true)
@@ -104,7 +103,7 @@ Gui.element{
     caption = "Join Game",
     style = 'green_button',
 }
-:on_click(function(player, element, event)
+:on_click(function(player, _, event)
     -- Remove welcome screen and add player to participants
     player_data[event.player_index].show_welcome_screen = false
     Roles.assign_player(player, {'Participant'}, nil, true, true)
@@ -118,7 +117,7 @@ Gui.element{
     caption = "Spectate Game Instead",
     style = 'button',
 }
-:on_click(function(player, element, event)
+:on_click(function(player, _)
     -- Toogle participant status and update selector screen
     local participant = Roles.player_has_role(player, 'Participant')
     if participant then
@@ -230,7 +229,7 @@ Gui.element(function(event_trigger, parent, data, category)
     data.vote_selectors[category] = selector
     return selector
 end)
-:on_selection_changed(function(player, element, event)
+:on_selection_changed(function(player, element)
     local data = player_data[player.index]
 
     -- Find the category for this vote selector
@@ -244,8 +243,8 @@ end)
 
     -- Update vote counts displayed to everyone
     local list_items = vote_selector_list(category)
-    for _, player in pairs(game.connected_players) do
-        local selector = player_data[player.index].vote_selectors[category]
+    for _, connected_player in pairs(game.connected_players) do
+        local selector = player_data[connected_player.index].vote_selectors[category]
         if selector and selector.valid then
             selector.items = list_items
         end
@@ -256,7 +255,7 @@ end)
 --- Welcome screen presenting users with a choice of joining the game or
 -- spectating in the game.
 local RoleSelectorWindow =
-Gui.element(function(event_trigger, parent)
+Gui.element(function(_, parent)
     local outer_frame =
     parent.add{
         name = "role_selector_window",
@@ -318,7 +317,7 @@ end)
 --- Race voting window.  Presents vote selectors for race map, fuel and lap count, and
 -- a button to toggle participation in the game.
 local RaceVoteWindow =
-Gui.element(function(event_trigger, parent, data)
+Gui.element(function(_, parent, data)
     local outer_frame =
     parent.add{
         name = "race_vote_window",
@@ -466,13 +465,13 @@ Event.add(defines.events.on_player_joined_game, function(event)
     end
 end)
 
-Event.add(defines.events.on_player_left_game, function(event)
+Event.add(defines.events.on_player_left_game, function()
     if primitives.enabled and not primitives.game_running then
         recount_votes()
     end
 end)
 
-Event.add(Mini_Games.events.on_game_starting, function(event)
+Event.add(Mini_Games.events.on_game_starting, function()
     if not primitives.enabled then return end
 
     primitives.game_running = true
@@ -482,7 +481,7 @@ Event.add(Mini_Games.events.on_game_starting, function(event)
     end
 end)
 
-Event.add(Mini_Games.events.on_game_stopped, function(event)
+Event.add(Mini_Games.events.on_game_stopped, function()
     if not primitives.enabled then return end
 
     primitives.game_running = false
