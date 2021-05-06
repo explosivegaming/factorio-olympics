@@ -26,7 +26,9 @@ local Mini_games = {
         on_participant_created = script.generate_event_name(),
         on_participant_joined = script.generate_event_name(),
         on_participant_left = script.generate_event_name(),
-        on_participant_removed = script.generate_event_name()
+        on_participant_removed = script.generate_event_name(),
+        on_game_starting = script.generate_event_name(),
+        on_game_stopped = script.generate_event_name()
     }
 }
 
@@ -236,7 +238,7 @@ end
 local function raise_event(name, player)
     script.raise_event(Mini_games.events[name], {
         name = Mini_games.events[name],
-        player_index = player.index,
+        player_index = player and player.index,
         tick = game.tick
     })
 end
@@ -745,6 +747,9 @@ function Mini_games.start_game(name, player_count, args)
     -- Check if we are able to start now, if not then this will be checked again with add_participant
     Task.set_timeout(120, delayed_player_count_check)
     check_participant_count()
+
+    -- Notify the game is starting
+    raise_event('on_game_starting')
 end
 
 ----- Stopping Mini Games -----
@@ -774,6 +779,9 @@ local close_game = Token.register(function(timeout_nonce)
 
     primitives.current_game = nil
     set_internal_state('Closed')
+
+    -- Notify the game has stopped
+    raise_event('on_game_stopped')
 end)
 
 --- Stop a mini game, calls on_stop then on_participant_removed

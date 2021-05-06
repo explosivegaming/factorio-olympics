@@ -32,4 +32,5 @@ return {
     'config.expcore.permission_groups', -- loads some predefined permission groups
     'config.expcore.roles', -- loads some predefined roles
     'config.expcore.gui_update_events', -- loads event handlers to update the core gui areas
+    'config.expcore.auto_play', -- Enable auto start of mini games with voting
 }
