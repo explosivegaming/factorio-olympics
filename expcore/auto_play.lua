@@ -117,6 +117,7 @@ Gui.element{
     caption = "Spectate Game Instead",
     style = 'button',
 }
+:style{ horizontally_stretchable = true }
 :on_click(function(player, _)
     -- Toogle participant status and update selector screen
     local participant = Roles.player_has_role(player, 'Participant')
@@ -209,6 +210,7 @@ Gui.element(function(event_trigger, parent, data, category)
 
     -- Wrapper flow to allow multiple selectors in the same flow.
     local flow = parent.add{
+        name = category,
         type = 'flow',
         direction = 'vertical',
     }
@@ -233,13 +235,8 @@ end)
     local data = player_data[player.index]
 
     -- Find the category for this vote selector
-    local category
-    for selector_category, selector in pairs(data.vote_selectors) do
-        if selector == element then
-            category = selector_category
-        end
-    end
-    if not category then return end
+    local category = element.parent.name
+    if not data.vote_selectors[category] then return end
 
     -- Update vote counts displayed to everyone
     local list_items = vote_selector_list(category)
@@ -336,15 +333,8 @@ Gui.element(function(_, parent, data)
         style = 'inside_shallow_frame',
     }
 
-    local header =
-    inner_frame.add{
-        type = 'frame',
-        direction = 'horizontal',
-        caption = "Vote for map",
-        style = 'subheader_frame',
-    }
+    local header = Gui.header(inner_frame, "Vote for map")
     header.style.padding = {4, 8}
-    header.style.use_header_filler = false
 
     local content =
     inner_frame.add{
@@ -412,7 +402,7 @@ update_time_left = Token.register(function()
             return
         end
         local seconds = math.ceil((primitives.start_time - game.tick) / 60)
-        message = {"", "starting in ", seconds, " seconds"}
+        message = {"", "Starting in ", seconds, " seconds"}
     else
         message = "Waiting for players to join"
     end
@@ -450,16 +440,12 @@ Event.add(defines.events.on_player_joined_game, function(event)
 
     if not primitives.enabled then return end
 
-    -- Reset votes cast by the player
-    for _, selector in pairs(data.vote_selectors) do
-        if selector.valid then
-            selector.selected_index = 0
-        end
-    end
-
-    -- Update vote counts shown to player
     for category, selector in pairs(data.vote_selectors) do
         if selector.valid then
+            -- Reset votes cast by the player
+            selector.selected_index = 0
+
+            -- Update vote counts shown to player
             selector.items = vote_selector_list(category)
         end
     end
